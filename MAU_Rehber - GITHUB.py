@@ -1,4 +1,4 @@
-﻿# Gerekli kütüphaneleri içe aktar
+# Gerekli kütüphaneleri içe aktar
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -20,6 +20,7 @@ import time
 
 # --- SABİTLER ---
 LOG_FILE = 'MAU_Rehber.log'
+PERSISTENT_FILE = "rehber_durumu.csv"
 ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
 ERROR_HTML_FILE = 'error_page_source.html'
 
@@ -68,18 +69,21 @@ def send_failure_email(config, error_details):
     except Exception as e:
         logging.error(f"HATA RAPORU E-POSTASI GÖNDERİLİRKEN YENİ BİR HATA OLUŞTU: {e}")
 
-def send_daily_report(config, personnel_list):
-    """Her çalıştığında güncel durumu içeren bir e-posta gönderir."""
+def send_email_report(config, added, removed, stats):
+    """Değişiklikleri ve istatistikleri içeren bir e-posta raporu gönderir."""
     sender = config['sender_email']
     password = config['password']
     receivers_list = [email.strip() for email in config['receiver_emails'].split(',')]
     today_str = datetime.now().strftime("%d %B %Y %H:%M")
-    subject = f"Maltepe Üniversitesi Günlük Personel Raporu - {today_str}"
-    
-    body = f"<h2>Günlük Personel Durum Raporu ({today_str})</h2>"
-    body += f"<p>Merhaba,</p><p>Otomatik kontrol başarıyla tamamlandı. Güncel personel sayısı: <b>{len(personnel_list)}</b></p>"
+    subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu - {today_str}"
+    body = f"<h2>Personel Rehberi Raporu ({today_str})</h2>"
+    body += "<h3>📊 Genel İstatistikler</h3>"
+    body += f"<ul><li><b>Toplam Personel Sayısı:</b> {stats['total_count']}</li></ul>"
+    if added or removed:
+        body += "<h3>🔄 Tespit Edilen Değişiklikler</h3>"
+        if added: body += "<h4>✅ Yeni Eklenen Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in added]) + "</ul>"
+        if removed: body += "<h4>❌ Listeden Çıkarılan Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in removed]) + "</ul>"
     body += "<hr><p>Bu, otomatik bir bildirimdir.</p>"
-    
     msg = MIMEText(body, 'html', 'utf-8')
     msg['Subject'] = subject
     msg['From'] = sender
@@ -88,7 +92,7 @@ def send_daily_report(config, personnel_list):
         server.starttls()
         server.login(sender, password)
         server.sendmail(sender, receivers_list, msg.as_string())
-    logging.info("Günlük durum raporu e-postası gönderildi.")
+    logging.info("Değişiklik raporu e-postası gönderildi.")
 
 def setup_selenium():
     chrome_options = Options()
@@ -151,14 +155,30 @@ def search_and_extract_results(driver):
             logging.error(f"Teşhis dosyaları kaydedilirken ek bir hata oluştu: {diag_e}")
         raise e
 
+def compare_lists(previous_list, current_list):
+    previous_set = {tuple(p.items()) for p in previous_list}; current_set = {tuple(p.items()) for p in current_list}
+    return [dict(p) for p in current_set - previous_set], [dict(p) for p in previous_set - current_set]
+def analyze_statistics(personnel_list):
+    stats = {}; stats['total_count'] = len(personnel_list)
+    return stats
+
 def main():
     """Programın ana giriş noktası."""
     setup_logging()
-    logging.info("="*30); logging.info("Kontrol başlatıldı (Basitleştirilmiş Mod).")
+    logging.info("="*30); logging.info("Kontrol başlatıldı.")
     config = load_config()
     if not config: sys.exit(1)
     
     try:
+        previous_results = []
+        if os.path.exists(PERSISTENT_FILE):
+            logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
+            with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                previous_results = list(reader)
+        else:
+            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
+            
         logging.info("Tarayıcı başlatılıyor...")
         driver = setup_selenium()
         current_results = []
@@ -171,11 +191,22 @@ def main():
         if not current_results:
             raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi (boş liste döndü).")
         
-        logging.info(f"Başarıyla {len(current_results)} personel verisi çekildi.")
+        logging.info("Listeler karşılaştırılıyor...")
+        added, removed = compare_lists(previous_results, current_results)
+        statistics = analyze_statistics(current_results)
         
-        # Karşılaştırma yapmadan, her zaman rapor gönder.
-        send_daily_report(config, current_results)
-        
+        if added or removed:
+            logging.info("Değişiklikler tespit edildi. Rapor e-postası gönderiliyor...")
+            send_email_report(config, added, removed, statistics)
+        else:
+            logging.info("Değişiklik tespit edilmedi. E-posta gönderilmeyecek.")
+            
+        logging.info(f"Güncel personel durumu dosyaya yazılıyor: {PERSISTENT_FILE}")
+        with open(PERSISTENT_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["Ad Soyad", "Birim"])
+            writer.writeheader()
+            writer.writerows(current_results)
+            
         logging.info("İşlem başarıyla tamamlandı.")
         
     except Exception as e:
