@@ -34,7 +34,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Betiği Çalıştır
-        id: script-run
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
@@ -48,16 +47,3 @@ jobs:
           name: personel-verisi
           path: rehber_durumu.csv
           if-no-files-found: error
-      
-      - name: Teşhis Dosyalarını Yükle
-        # Bu adım her zaman çalışır, böylece başarılı çalıştırmalardaki
-        # debug ekran görüntüsünü de görebiliriz.
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: son-calistirma-dosyalari
-          path: |
-            debug_after_click.png
-            error_screenshot.png
-            error_page_source.html
-          if-no-files-found: ignore
