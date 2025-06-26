@@ -103,45 +103,74 @@ def setup_selenium():
     return driver
 
 def search_and_extract_results(driver):
+    """
+    Sitedeki tüm personeli, A'dan Z'ye harf filtrelerine tıklayarak çeker.
+    Bu yöntem, 'tümünü göster' işlevinden daha güvenilirdir.
+    """
     try:
         logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
         driver.get("https://rehber.maltepe.edu.tr/")
-        time.sleep(5)
-        
-        logging.info("Cookie butonunu arıyor...")
-        try:
-            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(), "Kabul Et")]'))).click()
-            logging.info("Cookie kabul edildi.")
-        except Exception: 
-            logging.info("Cookie kutusu bulunamadı veya zaten kapalı.")
+        time.sleep(3) # Sayfanın ilk yüklemesi için bekle
 
-        logging.info("Arama kutusunu arıyor...")
-        search_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "search-key")))
-        search_box.clear()
-        search_box.send_keys(" ")
-        
-        logging.info("Arama butonunu arıyor...")
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "search-button"))).click()
-        logging.info("Arama yapıldı.")
-        
-        logging.info("Arama sonuçlarının yüklenmesi bekleniyor (en fazla 90 saniye)...")
-        WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
-        logging.info("Arama sonuçları yüklendi.")
-        
-        script = """
-        const results = []; const rows = document.querySelectorAll('.search-results-list .srcl-column');
-        rows.forEach(row => {
-            const nameEl = row.querySelector('div:nth-child(2)'); const surnameEl = row.querySelector('div:nth-child(3)');
-            const unitEl = row.querySelector('.unit');
-            if (nameEl && surnameEl && unitEl) {
-                const name = nameEl.innerText.replace('Adı', '').trim(); const surname = surnameEl.innerText.replace('Soyadı', '').trim();
-                const unit = unitEl.innerText.trim();
-                results.push({ 'Ad Soyad': `${name} ${surname}`, 'Birim': unit });
-            }
-        });
-        return results;
-        """
-        return driver.execute_script(script)
+        # Harf filtrelerinin listesini al
+        letter_filters = driver.find_elements(By.CSS_SELECTOR, ".main-search-filter-list .msfl-item")
+        all_results = []
+        collected_ids = set()
+
+        for i in range(len(letter_filters)):
+            # Her döngüde element listesini yeniden bul, çünkü sayfa yenileniyor olabilir.
+            filters = driver.find_elements(By.CSS_SELECTOR, ".main-search-filter-list .msfl-item")
+            letter_filter = filters[i]
+            letter = letter_filter.text
+            logging.info(f"'{letter}' harfine tıklanıyor...")
+            
+            # Tıklama öncesi sonuç sayısını al (sonraki bekleme için)
+            initial_result_count_text = driver.find_element(By.CSS_SELECTOR, ".search-results-count").text
+
+            letter_filter.click()
+            
+            # Sonuçların güncellenmesini bekle
+            try:
+                WebDriverWait(driver, 30).until_not(
+                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".search-results-count"), initial_result_count_text)
+                )
+            except TimeoutException:
+                logging.warning(f"'{letter}' harfi için sonuçlar güncellenmedi veya hiç sonuç yok.")
+                continue # Bir sonraki harfe geç
+
+            # Sonuçları JavaScript ile çek
+            script = """
+            const results = [];
+            const rows = document.querySelectorAll('.search-results-list .srcl-column');
+            rows.forEach(row => {
+                const nameEl = row.querySelector('div:nth-child(2)');
+                const surnameEl = row.querySelector('div:nth-child(3)');
+                const unitEl = row.querySelector('.srl-item:nth-child(4) > a.unit'); // Daha spesifik seçici
+                if (nameEl && surnameEl && unitEl) {
+                    const name = nameEl.innerText.replace('Adı', '').trim();
+                    const surname = surnameEl.innerText.replace('Soyadı', '').trim();
+                    const unit = unitEl.innerText.trim();
+                    const personId = `${name} ${surname}|${unit}`; // Benzersiz kimlik oluştur
+                    results.push({ 
+                        'id': personId,
+                        'data': { 'Ad Soyad': `${name} ${surname}`, 'Birim': unit }
+                    });
+                }
+            });
+            return results;
+            """
+            letter_results = driver.execute_script(script)
+
+            # Tekrarları önlemek için sonuçları işle
+            for person in letter_results:
+                if person['id'] not in collected_ids:
+                    collected_ids.add(person['id'])
+                    all_results.append(person['data'])
+            
+            logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu. Toplam benzersiz sonuç: {len(all_results)}")
+            time.sleep(1) # Siteye nefes aldırma süresi
+
+        return all_results
 
     except Exception as e:
         logging.error(f"Veri çekme fonksiyonunda bir hata oluştu: {e}")
@@ -156,29 +185,15 @@ def search_and_extract_results(driver):
         raise e
 
 def compare_lists(previous_list, current_list):
-    """
-    İki listeyi karşılaştırmak için daha güvenilir bir yöntem.
-    Her bir kişiyi "Ad Soyad|Birim" formatında bir string'e çevirerek karşılaştırır.
-    """
-    # Her bir kişi için benzersiz bir kimlik oluştur ('Ad Soyad|Birim')
     get_id = lambda p: f"{p.get('Ad Soyad', '')}|{p.get('Birim', '')}"
-
-    # Önceki listeyi bir kimlik set'ine ve bir kimlik->kişi haritasına dönüştür
     previous_ids = {get_id(p) for p in previous_list}
     previous_map = {get_id(p): p for p in previous_list}
-
-    # Güncel listeyi bir kimlik set'ine ve bir kimlik->kişi haritasına dönüştür
     current_ids = {get_id(p) for p in current_list}
     current_map = {get_id(p): p for p in current_list}
-    
-    # Farkları bul
     added_ids = current_ids - previous_ids
     removed_ids = previous_ids - current_ids
-    
-    # Kimliklere karşılık gelen tam kişi verilerini döndür
     added = [current_map[id] for id in added_ids]
     removed = [previous_map[id] for id in removed_ids]
-    
     return added, removed
 
 def analyze_statistics(personnel_list):
@@ -186,7 +201,6 @@ def analyze_statistics(personnel_list):
     return stats
 
 def main():
-    """Programın ana giriş noktası."""
     setup_logging()
     logging.info("="*30); logging.info("Kontrol başlatıldı.")
     config = load_config()
@@ -198,7 +212,6 @@ def main():
             logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
             with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
-                # Olası boş satırları filtrele
                 previous_results = [row for row in reader if row]
         else:
             logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
