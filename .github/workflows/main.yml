@@ -16,9 +16,12 @@ jobs:
       - name: Kodu Kopyala
         uses: actions/checkout@v4
 
-      # Önceki veriyi indirme adımı kaldırıldı.
-      # - name: Önceki Veriyi İndir (Artifact)
-      #   ...
+      - name: Önceki Veriyi İndir (Artifact)
+        uses: actions/download-artifact@v4
+        with:
+          name: personel-verisi
+          path: .
+        continue-on-error: true
 
       - name: Python'u Kur
         uses: actions/setup-python@v5
@@ -37,17 +40,24 @@ jobs:
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
         run: python "MAU_Rehber - GITHUB.py"
-      
-      # Güncel veriyi yükleme adımı kaldırıldı.
-      # - name: Güncel Veriyi Yükle (Artifact)
-      #   ...
-      
-      - name: Hata Durumunda Teşhis Dosyalarını Yükle
-        if: failure()
+
+      - name: Güncel Veriyi Yükle (Artifact)
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: hata-teshis-dosyalari
+          name: personel-verisi
+          path: rehber_durumu.csv
+          if-no-files-found: error
+      
+      - name: Teşhis Dosyalarını Yükle
+        # Bu adım her zaman çalışır, böylece başarılı çalıştırmalardaki
+        # debug ekran görüntüsünü de görebiliriz.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: son-calistirma-dosyalari
           path: |
+            debug_after_click.png
             error_screenshot.png
             error_page_source.html
           if-no-files-found: ignore
