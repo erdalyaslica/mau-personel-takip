@@ -1,5 +1,5 @@
 # Gerekli kütüphaneleri içe aktar
-import requests # Tarayıcı yerine doğrudan istek göndermek için
+import requests  # Tarayıcı yerine doğrudan API'ye istek göndermek için
 import csv
 import os
 import smtplib
@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from datetime import datetime
 import logging
 import sys
-from dotenv import load_dotenv
+from dotenv import load_dotenv # Yerel test için .env dosyasını okumak için
 import time
 
 # --- SABİTLER ---
@@ -29,11 +29,17 @@ def setup_logging():
                         handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
 
 def load_config():
-    """Ayarları yükler."""
+    """
+    Ayarları yükler. Lokal test için .env dosyasını, GitHub Actions için
+    ortam değişkenlerini kullanır.
+    """
     load_dotenv()
     config = {
-        'sender_email': os.getenv('SENDER_EMAIL'), 'password': os.getenv('SENDER_PASSWORD'),
-        'receiver_emails': os.getenv('RECEIVER_EMAILS'), 'smtp_server': "smtp.gmail.com", 'smtp_port': 587
+        'sender_email': os.getenv('SENDER_EMAIL'),
+        'password': os.getenv('SENDER_PASSWORD'),
+        'receiver_emails': os.getenv('RECEIVER_EMAILS'),
+        'smtp_server': "smtp.gmail.com",
+        'smtp_port': 587
     }
     if not all([config['sender_email'], config['password'], config['receiver_emails']]):
         logging.error("Bir veya daha fazla ortam değişkeni ayarlanmamış. Lütfen .env dosyanızı veya GitHub Secrets ayarlarınızı kontrol edin.")
@@ -87,40 +93,30 @@ def send_email_report(config, added, removed, stats):
     logging.info("Değişiklik raporu e-postası gönderildi.")
 
 def extract_data_via_api():
-    """
-    Sitenin API'sine doğrudan istek göndererek tüm personeli çeker.
-    """
+    """Sitenin API'sine doğrudan istek göndererek tüm personeli çeker."""
     all_results = []
     collected_ids = set()
 
     for letter in LETTERS:
         payload = {"groupId": None, "key": letter, "nameLike": False}
         logging.info(f"API'ye '{letter}' harfi için istek gönderiliyor...")
-        
         try:
             response = requests.post(API_URL, json=payload, headers=HEADERS, timeout=30)
-            response.raise_for_status() # Hatalı durum kodları için (4xx, 5xx) hata fırlat
-            
+            response.raise_for_status() 
             data = response.json()
             if data.get("Data"):
                 letter_results = data["Data"]
                 logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu.")
-                
                 for person in letter_results:
-                    # Gelen veriden Ad Soyad ve Birim oluştur
                     ad_soyad = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
-                    birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip() # Birden fazla birim varsa ilkini al
+                    birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip()
                     person_id = f"{ad_soyad}|{birim}"
-                    
                     if person_id not in collected_ids:
                         collected_ids.add(person_id)
                         all_results.append({'Ad Soyad': ad_soyad, 'Birim': birim})
-                
             else:
                 logging.warning(f"'{letter}' harfi için veri bulunamadı.")
-            
-            time.sleep(1) # İstekler arasında kısa bir bekleme
-
+            time.sleep(1)
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"API isteği sırasında bir hata oluştu: {e}")
 
