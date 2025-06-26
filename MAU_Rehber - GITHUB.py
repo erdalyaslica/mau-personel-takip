@@ -20,9 +20,8 @@ import time
 
 # --- SABİTLER ---
 LOG_FILE = 'MAU_Rehber.log'
-PERSISTENT_FILE = "rehber_durumu.csv"
 ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
-ERROR_HTML_FILE = 'error_page_source.html' # Hata anındaki HTML'i kaydetmek için
+ERROR_HTML_FILE = 'error_page_source.html'
 
 def setup_logging():
     """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
@@ -69,21 +68,18 @@ def send_failure_email(config, error_details):
     except Exception as e:
         logging.error(f"HATA RAPORU E-POSTASI GÖNDERİLİRKEN YENİ BİR HATA OLUŞTU: {e}")
 
-def send_email_report(config, added, removed, stats):
-    """Değişiklikleri ve istatistikleri içeren bir e-posta raporu gönderir."""
+def send_daily_report(config, personnel_list):
+    """Her çalıştığında güncel durumu içeren bir e-posta gönderir."""
     sender = config['sender_email']
     password = config['password']
     receivers_list = [email.strip() for email in config['receiver_emails'].split(',')]
     today_str = datetime.now().strftime("%d %B %Y %H:%M")
-    subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu - {today_str}"
-    body = f"<h2>Personel Rehberi Raporu ({today_str})</h2>"
-    body += "<h3>📊 Genel İstatistikler</h3>"
-    body += f"<ul><li><b>Toplam Personel Sayısı:</b> {stats['total_count']}</li></ul>"
-    if added or removed:
-        body += "<h3>🔄 Tespit Edilen Değişiklikler</h3>"
-        if added: body += "<h4>✅ Yeni Eklenen Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in added]) + "</ul>"
-        if removed: body += "<h4>❌ Listeden Çıkarılan Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in removed]) + "</ul>"
+    subject = f"Maltepe Üniversitesi Günlük Personel Raporu - {today_str}"
+    
+    body = f"<h2>Günlük Personel Durum Raporu ({today_str})</h2>"
+    body += f"<p>Merhaba,</p><p>Otomatik kontrol başarıyla tamamlandı. Güncel personel sayısı: <b>{len(personnel_list)}</b></p>"
     body += "<hr><p>Bu, otomatik bir bildirimdir.</p>"
+    
     msg = MIMEText(body, 'html', 'utf-8')
     msg['Subject'] = subject
     msg['From'] = sender
@@ -92,7 +88,7 @@ def send_email_report(config, added, removed, stats):
         server.starttls()
         server.login(sender, password)
         server.sendmail(sender, receivers_list, msg.as_string())
-    logging.info("Değişiklik raporu e-postası gönderildi.")
+    logging.info("Günlük durum raporu e-postası gönderildi.")
 
 def setup_selenium():
     chrome_options = Options()
@@ -106,7 +102,6 @@ def search_and_extract_results(driver):
     try:
         logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
         driver.get("https://rehber.maltepe.edu.tr/")
-        # Sayfanın oturması için kısa bir bekleme
         time.sleep(5)
         
         logging.info("Cookie butonunu arıyor...")
@@ -145,49 +140,25 @@ def search_and_extract_results(driver):
         return driver.execute_script(script)
 
     except Exception as e:
-        # --- HATA YAKALAMA BÖLÜMÜ ---
         logging.error(f"Veri çekme fonksiyonunda bir hata oluştu: {e}")
-        
-        # Ekran görüntüsü al
         try:
             driver.save_screenshot(ERROR_SCREENSHOT_FILE)
             logging.info(f"Hata anı ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
-        except Exception as screenshot_e:
-            logging.error(f"Ekran görüntüsü alınırken hata oluştu: {screenshot_e}")
-            
-        # HTML kaynak kodunu al
-        try:
             with open(ERROR_HTML_FILE, 'w', encoding='utf-8') as f:
                 f.write(driver.page_source)
             logging.info(f"Hata anı HTML kaynak kodu '{ERROR_HTML_FILE}' olarak kaydedildi.")
-        except Exception as html_e:
-            logging.error(f"HTML kaynak kodu alınırken hata oluştu: {html_e}")
-
-        # Orijinal hatayı yeniden yükselt
+        except Exception as diag_e:
+            logging.error(f"Teşhis dosyaları kaydedilirken ek bir hata oluştu: {diag_e}")
         raise e
 
-# Diğer fonksiyonlar (compare_lists, analyze_statistics, main) aynı kalabilir
-def compare_lists(previous_list, current_list):
-    previous_set = {tuple(p.items()) for p in previous_list}; current_set = {tuple(p.items()) for p in current_list}
-    return [dict(p) for p in current_set - previous_set], [dict(p) for p in previous_set - current_set]
-def analyze_statistics(personnel_list):
-    stats = {}; stats['total_count'] = len(personnel_list)
-    return stats
 def main():
     """Programın ana giriş noktası."""
     setup_logging()
-    logging.info("="*30); logging.info("Kontrol başlatıldı.")
+    logging.info("="*30); logging.info("Kontrol başlatıldı (Basitleştirilmiş Mod).")
     config = load_config()
     if not config: sys.exit(1)
+    
     try:
-        previous_results = []
-        if os.path.exists(PERSISTENT_FILE):
-            logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
-            with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                previous_results = list(reader)
-        else:
-            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
         logging.info("Tarayıcı başlatılıyor...")
         driver = setup_selenium()
         current_results = []
@@ -196,22 +167,17 @@ def main():
         finally:
             driver.quit()
             logging.info("Tarayıcı kapatıldı.")
+            
         if not current_results:
             raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi (boş liste döndü).")
-        logging.info("Listeler karşılaştırılıyor...")
-        added, removed = compare_lists(previous_results, current_results)
-        statistics = analyze_statistics(current_results)
-        if added or removed:
-            logging.info("Değişiklikler tespit edildi. Rapor e-postası gönderiliyor...")
-            send_email_report(config, added, removed, statistics)
-        else:
-            logging.info("Değişiklik tespit edilmedi. E-posta gönderilmeyecek.")
-        logging.info(f"Güncel personel durumu dosyaya yazılıyor: {PERSISTENT_FILE}")
-        with open(PERSISTENT_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["Ad Soyad", "Birim"])
-            writer.writeheader()
-            writer.writerows(current_results)
+        
+        logging.info(f"Başarıyla {len(current_results)} personel verisi çekildi.")
+        
+        # Karşılaştırma yapmadan, her zaman rapor gönder.
+        send_daily_report(config, current_results)
+        
         logging.info("İşlem başarıyla tamamlandı.")
+        
     except Exception as e:
         logging.exception("Programın çalışması sırasında beklenmedik bir hata oluştu.")
         send_failure_email(config, str(e))
