@@ -16,13 +16,11 @@ jobs:
       - name: Kodu Kopyala
         uses: actions/checkout@v4
 
-      # YENİ ADIM: Bir önceki çalıştırmadan kalan veri dosyasını indir.
       - name: Önceki Veriyi İndir (Artifact)
         uses: actions/download-artifact@v4
         with:
           name: personel-verisi
           path: .
-        # Bu adım, artifact bulunamazsa (ilk çalıştırma gibi) hata vermez.
         continue-on-error: true
 
       - name: Python'u Kur
@@ -35,20 +33,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # --- DEĞİŞİKLİK BURADA ---
       - name: Betiği Çalıştır
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
-        # Dosya adında boşluk olduğu için tırnak işareti kullanıyoruz.
         run: python "MAU_Rehber - GITHUB.py"
 
-      # YENİ ADIM: Bir sonraki çalıştırma için güncel veri dosyasını yükle.
       - name: Güncel Veriyi Yükle (Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: personel-verisi
           path: rehber_durumu.csv
-          # Eğer dosya bulunamazsa hata ver, bu bir kontrol noktasıdır.
           if-no-files-found: error
+      
+      # YENİ ADIM: Sadece hata durumunda çalışır
+      - name: Hata Durumunda Ekran Görüntüsünü Yükle
+        # Bu adım, bir önceki adım "Betiği Çalıştır" başarısız olursa çalışır.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hata-ekran-goruntusu
+          path: error_screenshot.png
+          if-no-files-found: ignore # Hata ekran görüntüsü alınamadıysa sorun yok.
