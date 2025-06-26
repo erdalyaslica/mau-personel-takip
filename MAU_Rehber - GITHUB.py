@@ -1,5 +1,6 @@
 ﻿# Gerekli kütüphaneleri içe aktar
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,37 +15,26 @@ from datetime import datetime
 from collections import Counter
 import logging
 import sys
-from dotenv import load_dotenv # Yerel .env dosyasını okumak için eklendi
+from dotenv import load_dotenv
 
 # --- SABİTLER ---
 LOG_FILE = 'MAU_Rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
+ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
 
 def setup_logging():
     """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                        handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
 
 def load_config():
-    """
-    Ayarları yükler. Lokal test için .env dosyasını, GitHub Actions için
-    ortam değişkenlerini kullanır.
-    """
+    """Ayarları yükler."""
     load_dotenv()
     config = {
-        'sender_email': os.getenv('SENDER_EMAIL'),
-        'password': os.getenv('SENDER_PASSWORD'),
-        'receiver_emails': os.getenv('RECEIVER_EMAILS'),
-        'smtp_server': "smtp.gmail.com",
-        'smtp_port': 587
+        'sender_email': os.getenv('SENDER_EMAIL'), 'password': os.getenv('SENDER_PASSWORD'),
+        'receiver_emails': os.getenv('RECEIVER_EMAILS'), 'smtp_server': "smtp.gmail.com", 'smtp_port': 587
     }
     if not all([config['sender_email'], config['password'], config['receiver_emails']]):
         logging.error("Bir veya daha fazla ortam değişkeni ayarlanmamış. Lütfen .env dosyanızı veya GitHub Secrets ayarlarınızı kontrol edin.")
@@ -57,15 +47,17 @@ def send_failure_email(config, error_details):
         sender = config['sender_email']
         password = config['password']
         receivers = [email.strip() for email in config['receiver_emails'].split(',')]
-        
         subject = "❗ Personel Rehberi Takip Betiği Başarısız Oldu"
-        body = f"<h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p><p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p><p><b>Hata Detayı:</b></p><pre>{error_details}</pre><p>Lütfen daha fazla bilgi için GitHub Actions loglarını kontrol ediniz.</p>"
-        
+        body = f"""
+        <h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p>
+        <p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p>
+        <p><b>Hata Detayı:</b></p><pre>{error_details}</pre>
+        <p>GitHub Actions loglarında bir ekran görüntüsü oluşturulmuş olabilir. Lütfen kontrol ediniz.</p>
+        """
         msg = MIMEText(body, 'html', 'utf-8')
         msg['Subject'] = subject
         msg['From'] = sender
         msg['To'] = ", ".join(receivers)
-        
         logging.info("Hata raporu e-postası gönderiliyor...")
         with smtplib.SMTP(config['smtp_server'], config['smtp_port']) as server:
             server.starttls()
@@ -82,7 +74,6 @@ def send_email_report(config, added, removed, stats):
     receivers_list = [email.strip() for email in config['receiver_emails'].split(',')]
     today_str = datetime.now().strftime("%d %B %Y %H:%M")
     subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu - {today_str}"
-    
     body = f"<h2>Personel Rehberi Raporu ({today_str})</h2>"
     body += "<h3>📊 Genel İstatistikler</h3>"
     body += f"<ul><li><b>Toplam Personel Sayısı:</b> {stats['total_count']}</li></ul>"
@@ -91,7 +82,6 @@ def send_email_report(config, added, removed, stats):
         if added: body += "<h4>✅ Yeni Eklenen Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in added]) + "</ul>"
         if removed: body += "<h4>❌ Listeden Çıkarılan Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in removed]) + "</ul>"
     body += "<hr><p>Bu, otomatik bir bildirimdir.</p>"
-    
     msg = MIMEText(body, 'html', 'utf-8')
     msg['Subject'] = subject
     msg['From'] = sender
@@ -109,6 +99,7 @@ def setup_selenium():
     service = Service(ChromeDriverManager().install()); driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": "Object.defineProperty(navigator, 'webdriver', { get: () => undefined })"})
     return driver
+
 def search_and_extract_results(driver):
     try:
         logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
@@ -120,8 +111,12 @@ def search_and_extract_results(driver):
         search_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "search-key"))); search_box.clear(); search_box.send_keys(" ")
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "search-button"))).click()
         logging.info("Arama yapıldı.")
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
+        
+        # --- DEĞİŞİKLİK BURADA ---
+        logging.info("Arama sonuçlarının yüklenmesi bekleniyor (en fazla 45 saniye)...")
+        WebDriverWait(driver, 45).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
         logging.info("Arama sonuçları yüklendi.")
+        
         script = """
         const results = []; const rows = document.querySelectorAll('.search-results-list .srcl-column');
         rows.forEach(row => {
@@ -136,8 +131,15 @@ def search_and_extract_results(driver):
         return results;
         """
         return driver.execute_script(script)
+    except TimeoutException as e:
+        logging.error("Sonuçlar yüklenirken zaman aşımına uğradı. Sayfanın ekran görüntüsü alınıyor...")
+        driver.save_screenshot(ERROR_SCREENSHOT_FILE)
+        logging.info(f"Ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
+        # Orijinal hatayı tekrar yükselterek programın hata moduna girmesini sağla
+        raise RuntimeError(f"Veri çekme sırasında zaman aşımı yaşandı: {e}")
     except Exception as e:
-        raise RuntimeError(f"Veri çekme sırasında hata oluştu: {e}")
+        raise RuntimeError(f"Veri çekme sırasında beklenmedik bir hata oluştu: {e}")
+
 def compare_lists(previous_list, current_list):
     previous_set = {tuple(p.items()) for p in previous_list}; current_set = {tuple(p.items()) for p in current_list}
     return [dict(p) for p in current_set - previous_set], [dict(p) for p in previous_set - current_set]
@@ -150,11 +152,8 @@ def main():
     setup_logging()
     logging.info("="*30)
     logging.info("Kontrol başlatıldı.")
-    
     config = load_config()
-    if not config:
-        sys.exit(1)
-
+    if not config: sys.exit(1)
     try:
         previous_results = []
         if os.path.exists(PERSISTENT_FILE):
@@ -164,7 +163,6 @@ def main():
                 previous_results = list(reader)
         else:
             logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
-
         logging.info("Tarayıcı başlatılıyor...")
         driver = setup_selenium()
         current_results = []
@@ -173,32 +171,25 @@ def main():
         finally:
             driver.quit()
             logging.info("Tarayıcı kapatıldı.")
-
         if not current_results:
             raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi (boş liste döndü).")
-        
         logging.info("Listeler karşılaştırılıyor...")
         added, removed = compare_lists(previous_results, current_results)
         statistics = analyze_statistics(current_results)
-        
         if added or removed:
             logging.info("Değişiklikler tespit edildi. Rapor e-postası gönderiliyor...")
             send_email_report(config, added, removed, statistics)
         else:
             logging.info("Değişiklik tespit edilmedi. E-posta gönderilmeyecek.")
-            
         logging.info(f"Güncel personel durumu dosyaya yazılıyor: {PERSISTENT_FILE}")
         with open(PERSISTENT_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=["Ad Soyad", "Birim"])
             writer.writeheader()
             writer.writerows(current_results)
-        
         logging.info("İşlem başarıyla tamamlandı.")
-
     except Exception as e:
         logging.exception("Programın çalışması sırasında beklenmedik bir hata oluştu.")
         send_failure_email(config, str(e))
-    
     finally:
         logging.info("Kontrol tamamlandı.")
         logging.info("="*30 + "\n")
