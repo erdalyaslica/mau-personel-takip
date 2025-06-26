@@ -131,12 +131,11 @@ def search_and_extract_results(driver):
         return results;
         """
         return driver.execute_script(script)
-    except TimeoutException as e:
+    except TimeoutException:
         logging.error("Sonuçlar yüklenirken zaman aşımına uğradı. Sayfanın ekran görüntüsü alınıyor...")
         driver.save_screenshot(ERROR_SCREENSHOT_FILE)
         logging.info(f"Ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
-        # Orijinal hatayı tekrar yükselterek programın hata moduna girmesini sağla
-        raise RuntimeError(f"Veri çekme sırasında zaman aşımı yaşandı: {e}")
+        raise RuntimeError("Veri çekme sırasında zaman aşımı yaşandı.")
     except Exception as e:
         raise RuntimeError(f"Veri çekme sırasında beklenmedik bir hata oluştu: {e}")
 
