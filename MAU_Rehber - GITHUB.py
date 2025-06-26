@@ -16,11 +16,13 @@ from collections import Counter
 import logging
 import sys
 from dotenv import load_dotenv
+import time
 
 # --- SABİTLER ---
 LOG_FILE = 'MAU_Rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
+ERROR_HTML_FILE = 'error_page_source.html' # Hata anındaki HTML'i kaydetmek için
 
 def setup_logging():
     """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
@@ -52,7 +54,7 @@ def send_failure_email(config, error_details):
         <h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p>
         <p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p>
         <p><b>Hata Detayı:</b></p><pre>{error_details}</pre>
-        <p>GitHub Actions loglarında bir ekran görüntüsü oluşturulmuş olabilir. Lütfen kontrol ediniz.</p>
+        <p>GitHub Actions loglarında bir ekran görüntüsü ve HTML kaynak dosyası oluşturulmuş olabilir. Lütfen kontrol ediniz.</p>
         """
         msg = MIMEText(body, 'html', 'utf-8')
         msg['Subject'] = subject
@@ -104,15 +106,25 @@ def search_and_extract_results(driver):
     try:
         logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
         driver.get("https://rehber.maltepe.edu.tr/")
+        # Sayfanın oturması için kısa bir bekleme
+        time.sleep(5)
+        
+        logging.info("Cookie butonunu arıyor...")
         try:
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(), "Kabul Et")]'))).click()
             logging.info("Cookie kabul edildi.")
-        except Exception: logging.info("Cookie kutusu bulunamadı veya zaten kapalı.")
-        search_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "search-key"))); search_box.clear(); search_box.send_keys(" ")
+        except Exception: 
+            logging.info("Cookie kutusu bulunamadı veya zaten kapalı.")
+
+        logging.info("Arama kutusunu arıyor...")
+        search_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "search-key")))
+        search_box.clear()
+        search_box.send_keys(" ")
+        
+        logging.info("Arama butonunu arıyor...")
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "search-button"))).click()
         logging.info("Arama yapıldı.")
         
-        # --- DEĞİŞİKLİK BURADA ---
         logging.info("Arama sonuçlarının yüklenmesi bekleniyor (en fazla 90 saniye)...")
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
         logging.info("Arama sonuçları yüklendi.")
@@ -131,26 +143,40 @@ def search_and_extract_results(driver):
         return results;
         """
         return driver.execute_script(script)
-    except TimeoutException:
-        logging.error("Sonuçlar yüklenirken zaman aşımına uğradı. Sayfanın ekran görüntüsü alınıyor...")
-        driver.save_screenshot(ERROR_SCREENSHOT_FILE)
-        logging.info(f"Ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
-        raise RuntimeError("Veri çekme sırasında zaman aşımı yaşandı.")
-    except Exception as e:
-        raise RuntimeError(f"Veri çekme sırasında beklenmedik bir hata oluştu: {e}")
 
+    except Exception as e:
+        # --- HATA YAKALAMA BÖLÜMÜ ---
+        logging.error(f"Veri çekme fonksiyonunda bir hata oluştu: {e}")
+        
+        # Ekran görüntüsü al
+        try:
+            driver.save_screenshot(ERROR_SCREENSHOT_FILE)
+            logging.info(f"Hata anı ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
+        except Exception as screenshot_e:
+            logging.error(f"Ekran görüntüsü alınırken hata oluştu: {screenshot_e}")
+            
+        # HTML kaynak kodunu al
+        try:
+            with open(ERROR_HTML_FILE, 'w', encoding='utf-8') as f:
+                f.write(driver.page_source)
+            logging.info(f"Hata anı HTML kaynak kodu '{ERROR_HTML_FILE}' olarak kaydedildi.")
+        except Exception as html_e:
+            logging.error(f"HTML kaynak kodu alınırken hata oluştu: {html_e}")
+
+        # Orijinal hatayı yeniden yükselt
+        raise e
+
+# Diğer fonksiyonlar (compare_lists, analyze_statistics, main) aynı kalabilir
 def compare_lists(previous_list, current_list):
     previous_set = {tuple(p.items()) for p in previous_list}; current_set = {tuple(p.items()) for p in current_list}
     return [dict(p) for p in current_set - previous_set], [dict(p) for p in previous_set - current_set]
 def analyze_statistics(personnel_list):
     stats = {}; stats['total_count'] = len(personnel_list)
     return stats
-
 def main():
     """Programın ana giriş noktası."""
     setup_logging()
-    logging.info("="*30)
-    logging.info("Kontrol başlatıldı.")
+    logging.info("="*30); logging.info("Kontrol başlatıldı.")
     config = load_config()
     if not config: sys.exit(1)
     try:
@@ -190,8 +216,7 @@ def main():
         logging.exception("Programın çalışması sırasında beklenmedik bir hata oluştu.")
         send_failure_email(config, str(e))
     finally:
-        logging.info("Kontrol tamamlandı.")
-        logging.info("="*30 + "\n")
+        logging.info("Kontrol tamamlandı."); logging.info("="*30 + "\n")
 
 if __name__ == "__main__":
     main()
