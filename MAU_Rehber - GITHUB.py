@@ -1,15 +1,10 @@
 # Gerekli kütüphaneleri içe aktar
-import undetected_chromedriver as uc
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import requests # Tarayıcı yerine doğrudan istek göndermek için
 import csv
 import os
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
-from collections import Counter
 import logging
 import sys
 from dotenv import load_dotenv
@@ -18,8 +13,13 @@ import time
 # --- SABİTLER ---
 LOG_FILE = 'MAU_Rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
-ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
-ERROR_HTML_FILE = 'error_page_source.html'
+API_URL = "https://rehber.maltepe.edu.tr/rehber/Home/GetPerson"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest"
+}
+LETTERS = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
 
 def setup_logging():
     """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
@@ -47,12 +47,7 @@ def send_failure_email(config, error_details):
         password = config['password']
         receivers = [email.strip() for email in config['receiver_emails'].split(',')]
         subject = "❗ Personel Rehberi Takip Betiği Başarısız Oldu"
-        body = f"""
-        <h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p>
-        <p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p>
-        <p><b>Hata Detayı:</b></p><pre>{error_details}</pre>
-        <p>GitHub Actions loglarında bir ekran görüntüsü ve HTML kaynak dosyası oluşturulmuş olabilir. Lütfen kontrol ediniz.</p>
-        """
+        body = f"<h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p><p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p><p><b>Hata Detayı:</b></p><pre>{error_details}</pre>"
         msg = MIMEText(body, 'html', 'utf-8')
         msg['Subject'] = subject
         msg['From'] = sender
@@ -91,93 +86,46 @@ def send_email_report(config, added, removed, stats):
         server.sendmail(sender, receivers_list, msg.as_string())
     logging.info("Değişiklik raporu e-postası gönderildi.")
 
-def setup_selenium():
+def extract_data_via_api():
     """
-    undetected-chromedriver kullanarak daha insan benzeri bir tarayıcı başlatır.
+    Sitenin API'sine doğrudan istek göndererek tüm personeli çeker.
     """
-    options = uc.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-    # GitHub Actions ortamında chromedriver'ı bulabilmesi için
-    driver = uc.Chrome(options=options, driver_executable_path=uc.find_chrome_executable())
-    return driver
+    all_results = []
+    collected_ids = set()
 
-def search_and_extract_results(driver):
-    """
-    Sitedeki tüm personeli, A'dan Z'ye harf filtrelerine tıklayarak çeker.
-    """
-    try:
-        logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
-        driver.get("https://rehber.maltepe.edu.tr/")
-        time.sleep(5) 
-
-        letter_filters = WebDriverWait(driver, 20).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".main-search-filter-list .msfl-item"))
-        )
-        all_results = []
-        collected_ids = set()
-
-        for i in range(len(letter_filters)):
-            filters = driver.find_elements(By.CSS_SELECTOR, ".main-search-filter-list .msfl-item")
-            letter_filter = filters[i]
-            letter = letter_filter.text
-            logging.info(f"'{letter}' harfine tıklanıyor...")
-            
-            initial_result_count_text = driver.find_element(By.CSS_SELECTOR, ".search-results-count").text
-            letter_filter.click()
-            
-            try:
-                WebDriverWait(driver, 30).until_not(
-                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".search-results-count"), initial_result_count_text)
-                )
-            except TimeoutException:
-                logging.warning(f"'{letter}' harfi için sonuçlar güncellenmedi veya hiç sonuç yok.")
-                continue
-
-            script = """
-            const results = []; const rows = document.querySelectorAll('.search-results-list .srcl-column');
-            rows.forEach(row => {
-                const nameEl = row.querySelector('div:nth-child(2)');
-                const surnameEl = row.querySelector('div:nth-child(3)');
-                const unitEl = row.querySelector('.srl-item:nth-child(4) > a.unit');
-                if (nameEl && surnameEl && unitEl) {
-                    const name = nameEl.innerText.replace('Adı', '').trim();
-                    const surname = surnameEl.innerText.replace('Soyadı', '').trim();
-                    const unit = unitEl.innerText.trim();
-                    const personId = `${name} ${surname}|${unit}`;
-                    results.push({ 
-                        'id': personId,
-                        'data': { 'Ad Soyad': `${name} ${surname}`, 'Birim': unit }
-                    });
-                }
-            });
-            return results;
-            """
-            letter_results = driver.execute_script(script)
-
-            for person in letter_results:
-                if person['id'] not in collected_ids:
-                    collected_ids.add(person['id'])
-                    all_results.append(person['data'])
-            
-            logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu. Toplam benzersiz sonuç: {len(all_results)}")
-            time.sleep(2)
-
-        return all_results
-
-    except Exception as e:
-        logging.error(f"Veri çekme fonksiyonunda bir hata oluştu: {e}")
+    for letter in LETTERS:
+        payload = {"groupId": None, "key": letter, "nameLike": False}
+        logging.info(f"API'ye '{letter}' harfi için istek gönderiliyor...")
+        
         try:
-            driver.save_screenshot(ERROR_SCREENSHOT_FILE)
-            logging.info(f"Hata anı ekran görüntüsü '{ERROR_SCREENSHOT_FILE}' olarak kaydedildi.")
-            with open(ERROR_HTML_FILE, 'w', encoding='utf-8') as f:
-                f.write(driver.page_source)
-            logging.info(f"Hata anı HTML kaynak kodu '{ERROR_HTML_FILE}' olarak kaydedildi.")
-        except Exception as diag_e:
-            logging.error(f"Teşhis dosyaları kaydedilirken ek bir hata oluştu: {diag_e}")
-        raise e
+            response = requests.post(API_URL, json=payload, headers=HEADERS, timeout=30)
+            response.raise_for_status() # Hatalı durum kodları için (4xx, 5xx) hata fırlat
+            
+            data = response.json()
+            if data.get("Data"):
+                letter_results = data["Data"]
+                logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu.")
+                
+                for person in letter_results:
+                    # Gelen veriden Ad Soyad ve Birim oluştur
+                    ad_soyad = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
+                    birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip() # Birden fazla birim varsa ilkini al
+                    person_id = f"{ad_soyad}|{birim}"
+                    
+                    if person_id not in collected_ids:
+                        collected_ids.add(person_id)
+                        all_results.append({'Ad Soyad': ad_soyad, 'Birim': birim})
+                
+            else:
+                logging.warning(f"'{letter}' harfi için veri bulunamadı.")
+            
+            time.sleep(1) # İstekler arasında kısa bir bekleme
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"API isteği sırasında bir hata oluştu: {e}")
+
+    logging.info(f"Toplam {len(all_results)} benzersiz personel verisi çekildi.")
+    return all_results
 
 def compare_lists(previous_list, current_list):
     get_id = lambda p: f"{p.get('Ad Soyad', '')}|{p.get('Birim', '')}"
@@ -197,7 +145,7 @@ def analyze_statistics(personnel_list):
 
 def main():
     setup_logging()
-    logging.info("="*30); logging.info("Kontrol başlatıldı.")
+    logging.info("="*30); logging.info("Kontrol başlatıldı (API Modu).")
     config = load_config()
     if not config: sys.exit(1)
     
@@ -211,17 +159,10 @@ def main():
         else:
             logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
             
-        logging.info("Tarayıcı başlatılıyor...")
-        driver = setup_selenium()
-        current_results = []
-        try:
-            current_results = search_and_extract_results(driver)
-        finally:
-            driver.quit()
-            logging.info("Tarayıcı kapatıldı.")
+        current_results = extract_data_via_api()
             
         if not current_results:
-            raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi (boş liste döndü).")
+            raise RuntimeError("API'den personel listesi çekilemedi (boş liste döndü).")
         
         logging.info("Listeler karşılaştırılıyor...")
         added, removed = compare_lists(previous_results, current_results)
