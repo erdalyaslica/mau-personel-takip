@@ -156,8 +156,31 @@ def search_and_extract_results(driver):
         raise e
 
 def compare_lists(previous_list, current_list):
-    previous_set = {tuple(p.items()) for p in previous_list}; current_set = {tuple(p.items()) for p in current_list}
-    return [dict(p) for p in current_set - previous_set], [dict(p) for p in previous_set - current_set]
+    """
+    İki listeyi karşılaştırmak için daha güvenilir bir yöntem.
+    Her bir kişiyi "Ad Soyad|Birim" formatında bir string'e çevirerek karşılaştırır.
+    """
+    # Her bir kişi için benzersiz bir kimlik oluştur ('Ad Soyad|Birim')
+    get_id = lambda p: f"{p.get('Ad Soyad', '')}|{p.get('Birim', '')}"
+
+    # Önceki listeyi bir kimlik set'ine ve bir kimlik->kişi haritasına dönüştür
+    previous_ids = {get_id(p) for p in previous_list}
+    previous_map = {get_id(p): p for p in previous_list}
+
+    # Güncel listeyi bir kimlik set'ine ve bir kimlik->kişi haritasına dönüştür
+    current_ids = {get_id(p) for p in current_list}
+    current_map = {get_id(p): p for p in current_list}
+    
+    # Farkları bul
+    added_ids = current_ids - previous_ids
+    removed_ids = previous_ids - current_ids
+    
+    # Kimliklere karşılık gelen tam kişi verilerini döndür
+    added = [current_map[id] for id in added_ids]
+    removed = [previous_map[id] for id in removed_ids]
+    
+    return added, removed
+
 def analyze_statistics(personnel_list):
     stats = {}; stats['total_count'] = len(personnel_list)
     return stats
@@ -175,7 +198,8 @@ def main():
             logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
             with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
-                previous_results = list(reader)
+                # Olası boş satırları filtrele
+                previous_results = [row for row in reader if row]
         else:
             logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
             
