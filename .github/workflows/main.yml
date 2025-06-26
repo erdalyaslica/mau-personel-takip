@@ -34,25 +34,29 @@ jobs:
           pip install -r requirements.txt
 
       - name: Betiği Çalıştır
+        # Bu adım hata verirse, sonraki adımlar if: success() ile kontrol edilir.
+        id: script-run
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
         run: python "MAU_Rehber - GITHUB.py"
 
+      # --- DEĞİŞİKLİK BURADA ---
       - name: Güncel Veriyi Yükle (Artifact)
+        # Sadece bir önceki "Betiği Çalıştır" adımı başarılı olursa çalışır.
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: personel-verisi
           path: rehber_durumu.csv
           if-no-files-found: error
       
-      # YENİ ADIM: Sadece hata durumunda çalışır
       - name: Hata Durumunda Ekran Görüntüsünü Yükle
-        # Bu adım, bir önceki adım "Betiği Çalıştır" başarısız olursa çalışır.
+        # Sadece "Betiği Çalıştır" adımı başarısız olursa çalışır.
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: hata-ekran-goruntusu
           path: error_screenshot.png
-          if-no-files-found: ignore # Hata ekran görüntüsü alınamadıysa sorun yok.
+          if-no-files-found: ignore
