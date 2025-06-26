@@ -113,8 +113,8 @@ def search_and_extract_results(driver):
         logging.info("Arama yapıldı.")
         
         # --- DEĞİŞİKLİK BURADA ---
-        logging.info("Arama sonuçlarının yüklenmesi bekleniyor (en fazla 45 saniye)...")
-        WebDriverWait(driver, 45).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
+        logging.info("Arama sonuçlarının yüklenmesi bekleniyor (en fazla 90 saniye)...")
+        WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
         logging.info("Arama sonuçları yüklendi.")
         
         script = """
