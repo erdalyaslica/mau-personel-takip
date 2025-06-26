@@ -1,12 +1,9 @@
 # Gerekli kütüphaneleri içe aktar
-from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 import csv
 import os
 import smtplib
@@ -23,7 +20,6 @@ LOG_FILE = 'MAU_Rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 ERROR_SCREENSHOT_FILE = 'error_screenshot.png'
 ERROR_HTML_FILE = 'error_page_source.html'
-DEBUG_SCREENSHOT_FILE = 'debug_after_search.png' # Arama sonrası anlık görüntü
 
 def setup_logging():
     """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
@@ -96,65 +92,80 @@ def send_email_report(config, added, removed, stats):
     logging.info("Değişiklik raporu e-postası gönderildi.")
 
 def setup_selenium():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless"); chrome_options.add_argument("--disable-gpu"); chrome_options.add_argument("--window-size=1920x1080"); chrome_options.add_argument("--no-sandbox"); chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled"); chrome_options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
-    service = Service(ChromeDriverManager().install()); driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": "Object.defineProperty(navigator, 'webdriver', { get: () => undefined })"})
+    """
+    undetected-chromedriver kullanarak daha insan benzeri bir tarayıcı başlatır.
+    """
+    options = uc.ChromeOptions()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    # GitHub Actions ortamında chromedriver'ı bulabilmesi için
+    driver = uc.Chrome(options=options, driver_executable_path=uc.find_chrome_executable())
     return driver
 
 def search_and_extract_results(driver):
     """
-    Sitedeki personeli, "Erdal" kelimesini aratarak çekmeyi dener.
-    Bu, boşluk karakteriyle ilgili bir sorun olup olmadığını test etmek için bir teşhis yöntemidir.
+    Sitedeki tüm personeli, A'dan Z'ye harf filtrelerine tıklayarak çeker.
     """
     try:
         logging.info("Siteye gidiliyor: https://rehber.maltepe.edu.tr/")
         driver.get("https://rehber.maltepe.edu.tr/")
-        time.sleep(3) 
+        time.sleep(5) 
 
-        logging.info("Cookie butonunu arıyor...")
-        try:
-            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(), "Kabul Et")]'))).click()
-            logging.info("Cookie kabul edildi.")
-        except Exception: 
-            logging.info("Cookie kutusu bulunamadı veya zaten kapalı.")
+        letter_filters = WebDriverWait(driver, 20).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".main-search-filter-list .msfl-item"))
+        )
+        all_results = []
+        collected_ids = set()
 
-        search_term = "Erdal"
-        logging.info(f"Arama kutusuna '{search_term}' yazılıyor...")
-        search_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "search-key")))
-        search_box.clear()
-        search_box.send_keys(search_term)
-        
-        logging.info("Arama butonuna tıklanıyor...")
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "search-button"))).click()
-        logging.info(f"'{search_term}' için arama yapıldı.")
-        
-        time.sleep(3)
-        driver.save_screenshot(DEBUG_SCREENSHOT_FILE)
-        logging.info(f"Arama sonrası anlık görüntü '{DEBUG_SCREENSHOT_FILE}' olarak kaydedildi.")
-        
-        logging.info("Arama sonuçlarının yüklenmesi bekleniyor...")
-        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".search-results-list .srcl-column")))
-        logging.info("Arama sonuçları yüklendi.")
-        
-        script = """
-        const results = [];
-        const rows = document.querySelectorAll('.search-results-list .srcl-column');
-        rows.forEach(row => {
-            const nameEl = row.querySelector('div:nth-child(2)');
-            const surnameEl = row.querySelector('div:nth-child(3)');
-            const unitEl = row.querySelector('.srl-item:nth-child(4) > a.unit');
-            if (nameEl && surnameEl && unitEl) {
-                const name = nameEl.innerText.replace('Adı', '').trim();
-                const surname = surnameEl.innerText.replace('Soyadı', '').trim();
-                const unit = unitEl.innerText.trim();
-                results.push({ 'Ad Soyad': `${name} ${surname}`, 'Birim': unit });
-            }
-        });
-        return results;
-        """
-        return driver.execute_script(script)
+        for i in range(len(letter_filters)):
+            filters = driver.find_elements(By.CSS_SELECTOR, ".main-search-filter-list .msfl-item")
+            letter_filter = filters[i]
+            letter = letter_filter.text
+            logging.info(f"'{letter}' harfine tıklanıyor...")
+            
+            initial_result_count_text = driver.find_element(By.CSS_SELECTOR, ".search-results-count").text
+            letter_filter.click()
+            
+            try:
+                WebDriverWait(driver, 30).until_not(
+                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".search-results-count"), initial_result_count_text)
+                )
+            except TimeoutException:
+                logging.warning(f"'{letter}' harfi için sonuçlar güncellenmedi veya hiç sonuç yok.")
+                continue
+
+            script = """
+            const results = []; const rows = document.querySelectorAll('.search-results-list .srcl-column');
+            rows.forEach(row => {
+                const nameEl = row.querySelector('div:nth-child(2)');
+                const surnameEl = row.querySelector('div:nth-child(3)');
+                const unitEl = row.querySelector('.srl-item:nth-child(4) > a.unit');
+                if (nameEl && surnameEl && unitEl) {
+                    const name = nameEl.innerText.replace('Adı', '').trim();
+                    const surname = surnameEl.innerText.replace('Soyadı', '').trim();
+                    const unit = unitEl.innerText.trim();
+                    const personId = `${name} ${surname}|${unit}`;
+                    results.push({ 
+                        'id': personId,
+                        'data': { 'Ad Soyad': `${name} ${surname}`, 'Birim': unit }
+                    });
+                }
+            });
+            return results;
+            """
+            letter_results = driver.execute_script(script)
+
+            for person in letter_results:
+                if person['id'] not in collected_ids:
+                    collected_ids.add(person['id'])
+                    all_results.append(person['data'])
+            
+            logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu. Toplam benzersiz sonuç: {len(all_results)}")
+            time.sleep(2)
+
+        return all_results
 
     except Exception as e:
         logging.error(f"Veri çekme fonksiyonunda bir hata oluştu: {e}")
@@ -186,7 +197,7 @@ def analyze_statistics(personnel_list):
 
 def main():
     setup_logging()
-    logging.info("="*30); logging.info("Kontrol başlatıldı (Test Modu: 'Erdal' aranıyor).")
+    logging.info("="*30); logging.info("Kontrol başlatıldı.")
     config = load_config()
     if not config: sys.exit(1)
     
@@ -197,7 +208,9 @@ def main():
             with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 previous_results = [row for row in reader if row]
-        
+        else:
+            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
+            
         logging.info("Tarayıcı başlatılıyor...")
         driver = setup_selenium()
         current_results = []
@@ -208,7 +221,7 @@ def main():
             logging.info("Tarayıcı kapatıldı.")
             
         if not current_results:
-            raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi.")
+            raise RuntimeError("Güncel personel listesi web sitesinden çekilemedi (boş liste döndü).")
         
         logging.info("Listeler karşılaştırılıyor...")
         added, removed = compare_lists(previous_results, current_results)
