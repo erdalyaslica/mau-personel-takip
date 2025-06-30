@@ -23,6 +23,9 @@ jobs:
           path: .
         continue-on-error: true
 
+      - name: Dosyaları Listele (İndirme Sonrası)
+        run: ls -l
+
       - name: Python'u Kur
         uses: actions/setup-python@v5
         with:
