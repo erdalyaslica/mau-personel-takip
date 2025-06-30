@@ -1,5 +1,5 @@
 # Gerekli kütüphaneleri içe aktar
-import requests  # Tarayıcı yerine doğrudan API'ye istek göndermek için
+import requests
 import csv
 import os
 import smtplib
@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from datetime import datetime
 import logging
 import sys
-from dotenv import load_dotenv # Yerel test için .env dosyasını okumak için
+from dotenv import load_dotenv
 import time
 
 # --- SABİTLER ---
@@ -29,17 +29,11 @@ def setup_logging():
                         handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
 
 def load_config():
-    """
-    Ayarları yükler. Lokal test için .env dosyasını, GitHub Actions için
-    ortam değişkenlerini kullanır.
-    """
+    """Ayarları yükler."""
     load_dotenv()
     config = {
-        'sender_email': os.getenv('SENDER_EMAIL'),
-        'password': os.getenv('SENDER_PASSWORD'),
-        'receiver_emails': os.getenv('RECEIVER_EMAILS'),
-        'smtp_server': "smtp.gmail.com",
-        'smtp_port': 587
+        'sender_email': os.getenv('SENDER_EMAIL'), 'password': os.getenv('SENDER_PASSWORD'),
+        'receiver_emails': os.getenv('RECEIVER_EMAILS'), 'smtp_server': "smtp.gmail.com", 'smtp_port': 587
     }
     if not all([config['sender_email'], config['password'], config['receiver_emails']]):
         logging.error("Bir veya daha fazla ortam değişkeni ayarlanmamış. Lütfen .env dosyanızı veya GitHub Secrets ayarlarınızı kontrol edin.")
@@ -106,7 +100,7 @@ def extract_data_via_api():
             data = response.json()
             if data.get("Data"):
                 letter_results = data["Data"]
-                logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu.")
+                # logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu.")
                 for person in letter_results:
                     ad_soyad = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
                     birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip()
@@ -116,7 +110,7 @@ def extract_data_via_api():
                         all_results.append({'Ad Soyad': ad_soyad, 'Birim': birim})
             else:
                 logging.warning(f"'{letter}' harfi için veri bulunamadı.")
-            time.sleep(1)
+            time.sleep(0.5) # İstekler arasında kısa bir bekleme
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"API isteği sırasında bir hata oluştu: {e}")
 
@@ -126,13 +120,17 @@ def extract_data_via_api():
 def compare_lists(previous_list, current_list):
     get_id = lambda p: f"{p.get('Ad Soyad', '')}|{p.get('Birim', '')}"
     previous_ids = {get_id(p) for p in previous_list}
-    previous_map = {get_id(p): p for p in previous_list}
     current_ids = {get_id(p) for p in current_list}
-    current_map = {get_id(p): p for p in current_list}
+    
+    # --- YENİ TEŞHİS LOGLARI ---
+    logging.info(f"Karşılaştırma: Önceki listede {len(previous_ids)} kayıt, güncel listede {len(current_ids)} kayıt var.")
+    
     added_ids = current_ids - previous_ids
     removed_ids = previous_ids - current_ids
-    added = [current_map[id] for id in added_ids]
-    removed = [previous_map[id] for id in removed_ids]
+    
+    added = [p for p in current_list if get_id(p) in added_ids]
+    removed = [p for p in previous_list if get_id(p) in removed_ids]
+    
     return added, removed
 
 def analyze_statistics(personnel_list):
@@ -149,9 +147,13 @@ def main():
         previous_results = []
         if os.path.exists(PERSISTENT_FILE):
             logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
-            with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                previous_results = [row for row in reader if row]
+            try:
+                with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    previous_results = [row for row in reader if row]
+                logging.info(f"Başarıyla {len(previous_results)} kayıt önceki listeden okundu.")
+            except Exception as e:
+                logging.error(f"Önceki personel listesi okunurken bir hata oluştu: {e}")
         else:
             logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
             
@@ -165,7 +167,7 @@ def main():
         statistics = analyze_statistics(current_results)
         
         if added or removed:
-            logging.info("Değişiklikler tespit edildi. Rapor e-postası gönderiliyor...")
+            logging.info(f"Değişiklikler tespit edildi: {len(added)} yeni, {len(removed)} çıkarılan.")
             send_email_report(config, added, removed, statistics)
         else:
             logging.info("Değişiklik tespit edilmedi. E-posta gönderilmeyecek.")
