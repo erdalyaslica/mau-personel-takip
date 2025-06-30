@@ -2,9 +2,14 @@ name: Personel Rehber Kontrolü
 
 on:
   schedule:
-    # Her gün sabah 09:00 (Türkiye saatiyle) çalışır.
-    # 06:00 UTC = 09:00 TRT
-    - cron: '0 6 * * *'
+    # Pazartesi-Cuma, sabah 09:00 (Türkiye saatiyle) çalışır.
+    # (06:00 UTC)
+    - cron: '0 6 * * 1-5'
+    
+    # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır.
+    # (15:00 UTC)
+    - cron: '0 15 * * 1-5'
+    
   workflow_dispatch:
     # Bu satır, "Actions" sekmesinden manuel olarak çalıştırmanıza olanak tanır.
 
