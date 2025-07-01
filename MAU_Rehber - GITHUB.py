@@ -1,4 +1,3 @@
-# Gerekli kütüphaneleri içe aktar
 import requests
 import csv
 import os
@@ -11,7 +10,7 @@ from dotenv import load_dotenv
 import time
 
 # --- SABİTLER ---
-LOG_FILE = 'MAU_Rehber.log'
+LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 API_URL = "https://rehber.maltepe.edu.tr/rehber/Home/GetPerson"
 HEADERS = {
@@ -22,173 +21,173 @@ HEADERS = {
 LETTERS = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
 
 def setup_logging():
-    """Loglama sistemini ayarlar, hem dosyaya hem konsola yazar."""
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler(sys.stdout)])
+    """Loglama sistemini ayarlar"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(LOG_FILE, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 
 def load_config():
-    """Ayarları yükler."""
+    """Gerekli ayarları yükler"""
     load_dotenv()
     config = {
-        'sender_email': os.getenv('SENDER_EMAIL'), 'password': os.getenv('SENDER_PASSWORD'),
-        'receiver_emails': os.getenv('RECEIVER_EMAILS'), 'smtp_server': "smtp.gmail.com", 'smtp_port': 587
+        'sender_email': os.getenv('SENDER_EMAIL'),
+        'password': os.getenv('SENDER_PASSWORD'),
+        'receiver_emails': os.getenv('RECEIVER_EMAILS'),
+        'smtp_server': "smtp.gmail.com",
+        'smtp_port': 587
     }
-    if not all([config['sender_email'], config['password'], config['receiver_emails']]):
-        logging.error("Bir veya daha fazla ortam değişkeni ayarlanmamış. Lütfen .env dosyanızı veya GitHub Secrets ayarlarınızı kontrol edin.")
+    
+    if not all(config.values()):
+        logging.error("Eksik ortam değişkenleri! Lütfen .env veya GitHub Secrets ayarlarını kontrol edin.")
         return None
     return config
 
-def send_failure_email(config, error_details):
-    """Programda bir hata oluştuğunda uyarı e-postası gönderir."""
+def send_email(config, subject, body, is_html=True):
+    """E-posta gönderir"""
     try:
-        sender = config['sender_email']
-        password = config['password']
-        receivers = [email.strip() for email in config['receiver_emails'].split(',')]
-        subject = "❗ Personel Rehberi Takip Betiği Başarısız Oldu"
-        body = f"<h2>Personel Rehberi Otomasyonu Hata Bildirimi</h2><p>Merhaba,</p><p>Personel rehberini kontrol eden otomatik betik bir hata nedeniyle çalışmasını tamamlayamadı.</p><p><b>Hata Detayı:</b></p><pre>{error_details}</pre>"
-        msg = MIMEText(body, 'html', 'utf-8')
+        msg = MIMEText(body, 'html' if is_html else 'plain', 'utf-8')
         msg['Subject'] = subject
-        msg['From'] = sender
-        msg['To'] = ", ".join(receivers)
-        logging.info("Hata raporu e-postası gönderiliyor...")
+        msg['From'] = config['sender_email']
+        msg['To'] = config['receiver_emails']
+        
         with smtplib.SMTP(config['smtp_server'], config['smtp_port']) as server:
             server.starttls()
-            server.login(sender, password)
-            server.sendmail(sender, receivers, msg.as_string())
-        logging.info("Hata raporu e-postası başarıyla gönderildi.")
+            server.login(config['sender_email'], config['password'])
+            server.sendmail(
+                config['sender_email'],
+                [email.strip() for email in config['receiver_emails'].split(',')],
+                msg.as_string()
+            )
+        logging.info("E-posta başarıyla gönderildi")
     except Exception as e:
-        logging.error(f"HATA RAPORU E-POSTASI GÖNDERİLİRKEN YENİ BİR HATA OLUŞTU: {e}")
+        logging.error(f"E-posta gönderilemedi: {str(e)}")
 
-def send_email_report(config, added, removed, stats):
-    """Değişiklikleri ve istatistikleri içeren bir e-posta raporu gönderir."""
-    sender = config['sender_email']
-    password = config['password']
-    receivers_list = [email.strip() for email in config['receiver_emails'].split(',')]
-    today_str = datetime.now().strftime("%d %B %Y %H:%M")
-    subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu - {today_str}"
-    body = f"<h2>Personel Rehberi Raporu ({today_str})</h2>"
-    body += "<h3>📊 Genel İstatistikler</h3>"
-    body += f"<ul><li><b>Toplam Personel Sayısı:</b> {stats['total_count']}</li></ul>"
-    if added or removed:
-        body += "<h3>🔄 Tespit Edilen Değişiklikler</h3>"
-        if added: body += "<h4>✅ Yeni Eklenen Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in added]) + "</ul>"
-        if removed: body += "<h4>❌ Listeden Çıkarılan Personel</h4><ul>" + "".join([f"<li><b>{p['Ad Soyad']}</b> - {p['Birim']}</li>" for p in removed]) + "</ul>"
-    body += "<hr><p>Bu, otomatik bir bildirimdir.</p>"
-    msg = MIMEText(body, 'html', 'utf-8')
-    msg['Subject'] = subject
-    msg['From'] = sender
-    msg['To'] = ", ".join(receivers_list)
-    with smtplib.SMTP(config['smtp_server'], config['smtp_port']) as server:
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, receivers_list, msg.as_string())
-    logging.info("Değişiklik raporu e-postası gönderildi.")
-
-def extract_data_via_api():
-    """Sitenin API'sine doğrudan istek göndererek tüm personeli çeker."""
-    all_results = []
-    collected_ids = set()
+def fetch_personnel_data():
+    """API'den personel verilerini çeker"""
+    all_personnel = []
+    seen_ids = set()
 
     for letter in LETTERS:
-        payload = {"groupId": None, "key": letter, "nameLike": False}
-        logging.info(f"API'ye '{letter}' harfi için istek gönderiliyor...")
         try:
-            response = requests.post(API_URL, json=payload, headers=HEADERS, timeout=30)
-            response.raise_for_status() 
-            data = response.json()
-            if data.get("Data"):
-                letter_results = data["Data"]
-                for person in letter_results:
-                    ad_soyad = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
-                    birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip()
-                    person_id = f"{ad_soyad}|{birim}"
-                    if person_id not in collected_ids:
-                        collected_ids.add(person_id)
-                        all_results.append({'Ad Soyad': ad_soyad, 'Birim': birim})
-            else:
-                logging.warning(f"'{letter}' harfi için veri bulunamadı.")
+            response = requests.post(
+                API_URL,
+                json={"groupId": None, "key": letter, "nameLike": False},
+                headers=HEADERS,
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json().get("Data", [])
+            
+            for person in data:
+                full_name = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
+                department = person.get('BirimAdi', 'Belirsiz').split('|')[0].strip()
+                person_id = f"{full_name}|{department}"
+                
+                if person_id not in seen_ids:
+                    seen_ids.add(person_id)
+                    all_personnel.append({
+                        'Ad Soyad': full_name,
+                        'Birim': department
+                    })
             time.sleep(0.5)
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"API isteği sırasında bir hata oluştu: {e}")
+        except Exception as e:
+            logging.error(f"'{letter}' harfi için veri çekilemedi: {str(e)}")
+    
+    logging.info(f"Toplam {len(all_personnel)} personel kaydı alındı")
+    return all_personnel
 
-    logging.info(f"Toplam {len(all_results)} benzersiz personel verisi çekildi.")
-    return all_results
-
-def compare_lists(previous_list, current_list):
-    get_id = lambda p: f"{p.get('Ad Soyad', '')}|{p.get('Birim', '')}"
-    previous_ids = {get_id(p) for p in previous_list}
-    current_ids = {get_id(p) for p in current_list}
+def compare_personnel_lists(old_list, new_list):
+    """İki personel listesini karşılaştırır"""
+    def get_key(person):
+        return f"{person['Ad Soyad']}|{person['Birim']}"
     
-    logging.info(f"Karşılaştırma: Önceki listede {len(previous_ids)} kayıt, güncel listede {len(current_ids)} kayıt var.")
+    old_keys = {get_key(p) for p in old_list}
+    new_keys = {get_key(p) for p in new_list}
     
-    added_ids = current_ids - previous_ids
-    removed_ids = previous_ids - current_ids
-    
-    added = [p for p in current_list if get_id(p) in added_ids]
-    removed = [p for p in previous_list if get_id(p) in removed_ids]
+    added = [p for p in new_list if get_key(p) not in old_keys]
+    removed = [p for p in old_list if get_key(p) not in new_keys]
     
     return added, removed
 
-def analyze_statistics(personnel_list):
-    stats = {}; stats['total_count'] = len(personnel_list)
-    return stats
+def generate_report_content(added, removed, total_count):
+    """E-posta içeriğini oluşturur"""
+    report_date = datetime.now().strftime("%d %B %Y %H:%M")
+    content = f"""
+    <h2>Personel Rehberi Güncellemesi ({report_date})</h2>
+    <p><strong>Toplam Personel Sayısı:</strong> {total_count}</p>
+    """
+    
+    if added:
+        content += "<h3>Yeni Eklenenler</h3><ul>"
+        content += "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added)
+        content += "</ul>"
+    
+    if removed:
+        content += "<h3>Çıkarılanlar</h3><ul>"
+        content += "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed)
+        content += "</ul>"
+    
+    if not added and not removed:
+        content += "<p>Değişiklik tespit edilmedi.</p>"
+    
+    return content
 
 def main():
     setup_logging()
-    logging.info("="*30)
-    logging.info("Kontrol başlatıldı (API Modu).")
+    logging.info("Personel rehberi kontrolü başlatıldı")
+    
     config = load_config()
     if not config:
         sys.exit(1)
     
     try:
-        previous_results = []
+        # Önceki verileri yükle
+        previous_data = []
         cache_hit = os.getenv('CACHE_HIT', 'false').lower() == 'true'
         
         if cache_hit and os.path.exists(PERSISTENT_FILE):
-            logging.info(f"Önceki personel listesi ({PERSISTENT_FILE}) bulundu. Okunuyor...")
             try:
-                with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    previous_results = [row for row in reader if row]
-                logging.info(f"Başarıyla {len(previous_results)} kayıt önceki listeden okundu.")
+                with open(PERSISTENT_FILE, mode='r', encoding='utf-8') as f:
+                    previous_data = list(csv.DictReader(f))
+                logging.info(f"Önceki veri yüklendi ({len(previous_data)} kayıt)")
             except Exception as e:
-                logging.error(f"Önceki personel listesi okunurken bir hata oluştu: {e}")
-                previous_results = []
-        else:
-            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı veya cache hit değil. Bu ilk çalıştırma olabilir.")
-            
-        current_results = extract_data_via_api()
-            
-        if not current_results:
-            raise RuntimeError("API'den personel listesi çekilemedi (boş liste döndü).")
+                logging.error(f"Önceki veri yüklenemedi: {str(e)}")
         
-        logging.info("Listeler karşılaştırılıyor...")
-        added, removed = compare_lists(previous_results, current_results)
-        statistics = analyze_statistics(current_results)
+        # Yeni verileri al
+        current_data = fetch_personnel_data()
+        if not current_data:
+            raise RuntimeError("API'den veri alınamadı")
         
+        # Karşılaştırma yap
+        added, removed = compare_personnel_lists(previous_data, current_data)
+        
+        # Rapor oluştur ve gönder
+        report_content = generate_report_content(added, removed, len(current_data))
+        
+        # Eğer değişiklik varsa veya ilk çalıştırmaysa rapor gönder
         if added or removed or not cache_hit:
-            logging.info(f"Değişiklikler tespit edildi: {len(added)} yeni, {len(removed)} çıkarılan.")
-            send_email_report(config, added, removed, statistics)
-        else:
-            logging.info("Değişiklik tespit edilmedi. E-posta gönderilmeyecek.")
-            
-        logging.info(f"Güncel personel durumu dosyaya yazılıyor: {PERSISTENT_FILE}")
-        with open(PERSISTENT_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["Ad Soyad", "Birim"])
+            subject = "Personel Rehberi Güncellemesi"
+            if not cache_hit:
+                subject += " (İlk Çalıştırma)"
+            send_email(config, subject, report_content)
+        
+        # Yeni veriyi kaydet
+        with open(PERSISTENT_FILE, mode='w', encoding='utf-8', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=['Ad Soyad', 'Birim'])
             writer.writeheader()
-            writer.writerows(current_results)
-            
-        logging.info("İşlem başarıyla tamamlandı.")
+            writer.writerows(current_data)
+        
+        logging.info("İşlem başarıyla tamamlandı")
         
     except Exception as e:
-        logging.exception("Programın çalışması sırasında beklenmedik bir hata oluştu.")
-        send_failure_email(config, str(e))
-    finally:
-        logging.info("Kontrol tamamlandı.")
-        logging.info("="*30 + "\n")
+        logging.error(f"Kritik hata: {str(e)}")
+        send_email(config, "Personel Rehberi Hatası", f"<p>Hata oluştu:</p><pre>{str(e)}</pre>")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
