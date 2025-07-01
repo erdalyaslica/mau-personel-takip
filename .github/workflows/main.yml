@@ -1,22 +1,3 @@
-name: Personel Rehber Kontrolü
-
-on:
-  schedule:
-    # Pazartesi-Cuma, sabah 09:00 (Türkiye saatiyle) çalışır.
-    # (06:00 UTC)
-    - cron: '0 6 * * 1-5'
-    
-    # Pazartesi-Cuma, sabah 10:40 (Türkiye saatiyle) çalışır.
-    # (07:40 UTC)
-    - cron: '40 7 * * 1-5'
-
-    # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır.
-    # (15:00 UTC)
-    - cron: '0 15 * * 1-5'
-    
-  workflow_dispatch:
-    # Bu satır, "Actions" sekmesinden manuel olarak çalıştırmanıza olanak tanır.
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,15 +6,25 @@ jobs:
       - name: Kodu Kopyala
         uses: actions/checkout@v4
 
-      # --- DEĞİŞİKLİK BURADA: ARTIFACT YERİNE CACHE KULLANILIYOR ---
       - name: Önceki Veriyi Cache'den Geri Yükle
-        # Bu adım, 'personel-veri-cache' adında bir önbellek arar
-        # ve bulursa içindeki 'rehber_durumu.csv' dosyasını geri yükler.
         uses: actions/cache@v4
         id: cache-personel-veri
         with:
           path: rehber_durumu.csv
-          key: personel-veri-cache-v1
+          key: ${{ runner.os }}-personel-veri-${{ hashFiles('MAU_Rehber - GITHUB.py') }}
+          restore-keys: |
+            ${{ runner.os }}-personel-veri-
+
+      - name: Cache Durumunu Kontrol Et
+        run: |
+          if [ -f "rehber_durumu.csv" ]; then
+            echo "Önceki veri başarıyla yüklendi"
+            echo "cache-hit=true" >> $GITHUB_OUTPUT
+          else
+            echo "Önceki veri bulunamadı, yeni oluşturulacak"
+            echo "cache-hit=false" >> $GITHUB_OUTPUT
+          fi
+        id: check-cache
 
       - name: Dosyaları Listele (Cache Sonrası)
         run: ls -l
@@ -41,7 +32,7 @@ jobs:
       - name: Python'u Kur
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' 
+          python-version: '3.11'
 
       - name: Gerekli Kütüphaneleri Yükle
         run: |
@@ -53,8 +44,5 @@ jobs:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
+          CACHE_HIT: ${{ steps.check-cache.outputs.cache-hit }}
         run: python "MAU_Rehber - GITHUB.py"
-      
-      # Not: Cache sistemi, 'rehber_durumu.csv' dosyasında bir değişiklik
-      # olduğunda, iş akışı sonunda otomatik olarak güncel halini kaydeder.
-      # Ayrı bir yükleme adımı gerekmez.
