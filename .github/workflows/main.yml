@@ -32,7 +32,6 @@ jobs:
           path: .
         continue-on-error: true
 
-      # YENİ TEŞHİS ADIMI
       - name: Dosyaları Listele (İndirme Sonrası)
         run: ls -l
 
