@@ -2,17 +2,15 @@ name: Personel Rehber Kontrolü
 
 on:
   schedule:
-    # Pazartesi-Cuma, sabah 09:00 (Türkiye saatiyle) çalışır (06:00 UTC)
-    - cron: '0 6 * * 1-5'
-    # Pazartesi-Cuma, sabah 10:40 (Türkiye saatiyle) çalışır (07:40 UTC)
-    - cron: '40 7 * * 1-5'
-    # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır (15:00 UTC)
-    - cron: '0 15 * * 1-5'
+    - cron: '0 6 * * 1-5'  # Hafta içi sabah 09:00 (TR)
+    - cron: '40 7 * * 1-5'  # Hafta içi sabah 10:40 (TR)
+    - cron: '0 15 * * 1-5'  # Hafta içi akşam 18:00 (TR)
   workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Kodu Kopyala
         uses: actions/checkout@v4
@@ -22,11 +20,11 @@ jobs:
         id: personel-cache
         with:
           path: rehber_durumu.csv
-          key: ${{ runner.os }}-personel-${{ hashFiles('MAU_Rehber - GITHUB.py') }}
+          key: ${{ runner.os }}-personel-${{ hashFiles('mau_rehber.py') }}
           restore-keys: |
             ${{ runner.os }}-personel-
 
-      - name: Cache Durumunu Kaydet
+      - name: Cache Durumunu Kontrol Et
         id: cache-check
         run: |
           if [ -f "rehber_durumu.csv" ]; then
@@ -45,19 +43,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dotenv
 
-
       - name: Betiği Çalıştır
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
           CACHE_HIT: ${{ steps.cache-check.outputs.cache-hit }}
-        run: python "MAU_Rehber - GITHUB.py"  # TIRNAK İÇİNDE ve .py uzantılı
-        
+        run: python mau_rehber.py
 
-      - name: Yeni Veriyi Cache'e Kaydet
+      - name: Yeni Veriyi Kaydet
+        uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/cache/save@v4
         with:
+          name: personel-verisi
           path: rehber_durumu.csv
-          key: ${{ runner.os }}-personel-${{ hashFiles('MAU_Rehber - GITHUB.py') }}
+          retention-days: 7
