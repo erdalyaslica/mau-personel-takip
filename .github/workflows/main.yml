@@ -10,6 +10,11 @@ on:
     # (15:00 UTC)
     - cron: '0 15 * * 1-5'
     
+    # YENİ EKLENEN ZAMANLAMA
+    # Pazartesi-Cuma, sabah 10:40 (Türkiye saatiyle) çalışır.
+    # (07:40 UTC)
+    - cron: '5 7 * * 1-5'
+    
   workflow_dispatch:
     # Bu satır, "Actions" sekmesinden manuel olarak çalıştırmanıza olanak tanır.
 
