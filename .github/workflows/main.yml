@@ -3,7 +3,7 @@ name: Personel Rehber Kontrolü
 on:
   schedule:
     - cron: '0 6 * * 1-5'  # Hafta içi sabah 09:00 (TR)
-    - cron: '40 7 * * 1-5'  # Hafta içi sabah 10:40 (TR)
+    - cron: '24 8 * * 1-5'  # Hafta içi sabah 10:40 (TR)
     - cron: '0 15 * * 1-5'  # Hafta içi akşam 18:00 (TR)
   workflow_dispatch:
 
