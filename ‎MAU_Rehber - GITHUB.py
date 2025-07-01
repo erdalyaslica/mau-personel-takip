@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import time
 
 # --- SABİTLER ---
-LOG_FILE = 'personel_rehber.log'
+LOG_FILE = 'MAU_Rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 API_URL = "https://rehber.maltepe.edu.tr/rehber/Home/GetPerson"
 HEADERS = {
@@ -139,6 +139,7 @@ def generate_report_content(added, removed, total_count):
 
 def main():
     setup_logging()
+    logging.info("="*50)
     logging.info("Personel rehberi kontrolü başlatıldı")
     
     config = load_config()
@@ -166,15 +167,19 @@ def main():
         # Karşılaştırma yap
         added, removed = compare_personnel_lists(previous_data, current_data)
         
-        # Rapor oluştur ve gönder
+        # Rapor oluştur
         report_content = generate_report_content(added, removed, len(current_data))
         
-        # Eğer değişiklik varsa veya ilk çalıştırmaysa rapor gönder
+        # E-posta gönderim mantığı
         if added or removed or not cache_hit:
             subject = "Personel Rehberi Güncellemesi"
             if not cache_hit:
                 subject += " (İlk Çalıştırma)"
+                report_content = "<h2>İlk Çalıştırma - Tüm Personel Listesi</h2>" + report_content
+            
             send_email(config, subject, report_content)
+        else:
+            logging.info("Değişiklik yok, e-posta gönderilmedi")
         
         # Yeni veriyi kaydet
         with open(PERSISTENT_FILE, mode='w', encoding='utf-8', newline='') as f:
@@ -186,8 +191,11 @@ def main():
         
     except Exception as e:
         logging.error(f"Kritik hata: {str(e)}")
-        send_email(config, "Personel Rehberi Hatası", f"<p>Hata oluştu:</p><pre>{str(e)}</pre>")
+        if config:
+            send_email(config, "Personel Rehberi Hatası", f"<p>Hata oluştu:</p><pre>{str(e)}</pre>")
         sys.exit(1)
+    finally:
+        logging.info("="*50)
 
 if __name__ == "__main__":
     main()
