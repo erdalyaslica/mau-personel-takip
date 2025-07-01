@@ -6,10 +6,9 @@ on:
     # (06:00 UTC)
     - cron: '0 6 * * 1-5'
     
-    # YENİ EKLENEN ZAMANLAMA
     # Pazartesi-Cuma, sabah 10:40 (Türkiye saatiyle) çalışır.
     # (07:40 UTC)
-    - cron: '12 7 * * 1-5'
+    - cron: '40 7 * * 1-5'
 
     # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır.
     # (15:00 UTC)
@@ -33,6 +32,7 @@ jobs:
           path: .
         continue-on-error: true
 
+      # YENİ TEŞHİS ADIMI
       - name: Dosyaları Listele (İndirme Sonrası)
         run: ls -l
 
