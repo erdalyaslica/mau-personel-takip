@@ -137,17 +137,17 @@ def analyze_statistics(personnel_list):
 
 def main():
     setup_logging()
-    logging.info("="*30); logging.info("Kontrol başlatıldı (API Modu).")
+    logging.info("="*30)
+    logging.info("Kontrol başlatıldı (API Modu).")
     config = load_config()
-    if not config: sys.exit(1)
+    if not config:
+        sys.exit(1)
     
     try:
         previous_results = []
-        # --- YENİ TEŞHİS LOGLARI ---
-        logging.info(f"Mevcut çalışma dizini: {os.getcwd()}")
-        logging.info(f"Kontrol edilen dosya yolu: {os.path.abspath(PERSISTENT_FILE)}")
+        cache_hit = os.getenv('CACHE_HIT', 'false').lower() == 'true'
         
-        if os.path.exists(PERSISTENT_FILE):
+        if cache_hit and os.path.exists(PERSISTENT_FILE):
             logging.info(f"Önceki personel listesi ({PERSISTENT_FILE}) bulundu. Okunuyor...")
             try:
                 with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
@@ -156,8 +156,9 @@ def main():
                 logging.info(f"Başarıyla {len(previous_results)} kayıt önceki listeden okundu.")
             except Exception as e:
                 logging.error(f"Önceki personel listesi okunurken bir hata oluştu: {e}")
+                previous_results = []
         else:
-            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı. Bu ilk çalıştırma olabilir.")
+            logging.warning(f"Önceki personel listesi ({PERSISTENT_FILE}) bulunamadı veya cache hit değil. Bu ilk çalıştırma olabilir.")
             
         current_results = extract_data_via_api()
             
@@ -168,7 +169,7 @@ def main():
         added, removed = compare_lists(previous_results, current_results)
         statistics = analyze_statistics(current_results)
         
-        if added or removed:
+        if added or removed or not cache_hit:
             logging.info(f"Değişiklikler tespit edildi: {len(added)} yeni, {len(removed)} çıkarılan.")
             send_email_report(config, added, removed, statistics)
         else:
@@ -186,7 +187,8 @@ def main():
         logging.exception("Programın çalışması sırasında beklenmedik bir hata oluştu.")
         send_failure_email(config, str(e))
     finally:
-        logging.info("Kontrol tamamlandı."); logging.info("="*30 + "\n")
+        logging.info("Kontrol tamamlandı.")
+        logging.info("="*30 + "\n")
 
 if __name__ == "__main__":
     main()
