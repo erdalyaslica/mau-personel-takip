@@ -4,16 +4,16 @@ on:
   schedule:
     # Pazartesi-Cuma, sabah 09:00 (Türkiye saatiyle) çalışır.
     # (06:00 UTC)
-    - cron: '0 7 * * 1-5'
-    
-    # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır.
-    # (15:00 UTC)
-    - cron: '0 15 * * 1-5'
+    - cron: '0 6 * * 1-5'
     
     # YENİ EKLENEN ZAMANLAMA
     # Pazartesi-Cuma, sabah 10:40 (Türkiye saatiyle) çalışır.
     # (07:40 UTC)
-    - cron: '10 7 * * 1-5'
+    - cron: '12 7 * * 1-5'
+
+    # Pazartesi-Cuma, akşam 18:00 (Türkiye saatiyle) çalışır.
+    # (15:00 UTC)
+    - cron: '0 15 * * 1-5'
     
   workflow_dispatch:
     # Bu satır, "Actions" sekmesinden manuel olarak çalıştırmanıza olanak tanır.
