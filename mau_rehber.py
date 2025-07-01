@@ -9,12 +9,12 @@ import sys
 from dotenv import load_dotenv
 import time
 
-# --- SABİTLER ---
-LOG_FILE = 'MAU_Rehber.log'
+# Sabitler
+LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 API_URL = "https://rehber.maltepe.edu.tr/rehber/Home/GetPerson"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest"
 }
@@ -34,18 +34,20 @@ def setup_logging():
 def load_config():
     """Gerekli ayarları yükler"""
     load_dotenv()
-    config = {
+    required_vars = ['SENDER_EMAIL', 'SENDER_PASSWORD', 'RECEIVER_EMAILS']
+    missing = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing:
+        logging.error(f"Eksik ortam değişkenleri: {', '.join(missing)}")
+        return None
+        
+    return {
         'sender_email': os.getenv('SENDER_EMAIL'),
         'password': os.getenv('SENDER_PASSWORD'),
         'receiver_emails': os.getenv('RECEIVER_EMAILS'),
         'smtp_server': "smtp.gmail.com",
         'smtp_port': 587
     }
-    
-    if not all(config.values()):
-        logging.error("Eksik ortam değişkenleri! Lütfen .env veya GitHub Secrets ayarlarını kontrol edin.")
-        return None
-    return config
 
 def send_email(config, subject, body, is_html=True):
     """E-posta gönderir"""
@@ -63,13 +65,13 @@ def send_email(config, subject, body, is_html=True):
                 [email.strip() for email in config['receiver_emails'].split(',')],
                 msg.as_string()
             )
-        logging.info("E-posta başarıyla gönderildi")
+        logging.info("E-posta gönderildi")
     except Exception as e:
         logging.error(f"E-posta gönderilemedi: {str(e)}")
 
 def fetch_personnel_data():
     """API'den personel verilerini çeker"""
-    all_personnel = []
+    personnel = []
     seen_ids = set()
 
     for letter in LETTERS:
@@ -81,30 +83,26 @@ def fetch_personnel_data():
                 timeout=30
             )
             response.raise_for_status()
-            data = response.json().get("Data", [])
             
-            for person in data:
+            for person in response.json().get("Data", []):
                 full_name = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
                 department = person.get('BirimAdi', 'Belirsiz').split('|')[0].strip()
                 person_id = f"{full_name}|{department}"
                 
                 if person_id not in seen_ids:
                     seen_ids.add(person_id)
-                    all_personnel.append({
-                        'Ad Soyad': full_name,
-                        'Birim': department
-                    })
+                    personnel.append({'Ad Soyad': full_name, 'Birim': department})
+                    
             time.sleep(0.5)
         except Exception as e:
             logging.error(f"'{letter}' harfi için veri çekilemedi: {str(e)}")
     
-    logging.info(f"Toplam {len(all_personnel)} personel kaydı alındı")
-    return all_personnel
+    logging.info(f"Toplam {len(personnel)} personel kaydı alındı")
+    return personnel
 
-def compare_personnel_lists(old_list, new_list):
-    """İki personel listesini karşılaştırır"""
-    def get_key(person):
-        return f"{person['Ad Soyad']}|{person['Birim']}"
+def compare_lists(old_list, new_list):
+    """İki listeyi karşılaştırır"""
+    def get_key(p): return f"{p['Ad Soyad']}|{p['Birim']}"
     
     old_keys = {get_key(p) for p in old_list}
     new_keys = {get_key(p) for p in new_list}
@@ -114,33 +112,30 @@ def compare_personnel_lists(old_list, new_list):
     
     return added, removed
 
-def generate_report_content(added, removed, total_count):
-    """E-posta içeriğini oluşturur"""
-    report_date = datetime.now().strftime("%d %B %Y %H:%M")
-    content = f"""
-    <h2>Personel Rehberi Güncellemesi ({report_date})</h2>
-    <p><strong>Toplam Personel Sayısı:</strong> {total_count}</p>
+def generate_report(added, removed, total):
+    """Rapor içeriğini oluşturur"""
+    date_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    report = f"""
+    <h2>Personel Rehberi Raporu ({date_str})</h2>
+    <p><b>Toplam Personel:</b> {total}</p>
     """
     
     if added:
-        content += "<h3>Yeni Eklenenler</h3><ul>"
-        content += "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added)
-        content += "</ul>"
+        report += "<h3>Yeni Eklenenler</h3><ul>" + \
+                 "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added) + \
+                 "</ul>"
     
     if removed:
-        content += "<h3>Çıkarılanlar</h3><ul>"
-        content += "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed)
-        content += "</ul>"
+        report += "<h3>Çıkarılanlar</h3><ul>" + \
+                 "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed) + \
+                 "</ul>"
     
-    if not added and not removed:
-        content += "<p>Değişiklik tespit edilmedi.</p>"
-    
-    return content
+    return report
 
 def main():
     setup_logging()
     logging.info("="*50)
-    logging.info("Personel rehberi kontrolü başlatıldı")
+    logging.info("Personel rehber kontrolü başlatıldı")
     
     config = load_config()
     if not config:
@@ -153,7 +148,7 @@ def main():
         
         if cache_hit and os.path.exists(PERSISTENT_FILE):
             try:
-                with open(PERSISTENT_FILE, mode='r', encoding='utf-8') as f:
+                with open(PERSISTENT_FILE, 'r', encoding='utf-8') as f:
                     previous_data = list(csv.DictReader(f))
                 logging.info(f"Önceki veri yüklendi ({len(previous_data)} kayıt)")
             except Exception as e:
@@ -165,24 +160,21 @@ def main():
             raise RuntimeError("API'den veri alınamadı")
         
         # Karşılaştırma yap
-        added, removed = compare_personnel_lists(previous_data, current_data)
+        added, removed = compare_lists(previous_data, current_data)
         
-        # Rapor oluştur
-        report_content = generate_report_content(added, removed, len(current_data))
-        
-        # E-posta gönderim mantığı
+        # Rapor oluştur ve gönder
         if added or removed or not cache_hit:
             subject = "Personel Rehberi Güncellemesi"
             if not cache_hit:
                 subject += " (İlk Çalıştırma)"
-                report_content = "<h2>İlk Çalıştırma - Tüm Personel Listesi</h2>" + report_content
             
-            send_email(config, subject, report_content)
+            report = generate_report(added, removed, len(current_data))
+            send_email(config, subject, report)
         else:
             logging.info("Değişiklik yok, e-posta gönderilmedi")
         
         # Yeni veriyi kaydet
-        with open(PERSISTENT_FILE, mode='w', encoding='utf-8', newline='') as f:
+        with open(PERSISTENT_FILE, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['Ad Soyad', 'Birim'])
             writer.writeheader()
             writer.writerows(current_data)
