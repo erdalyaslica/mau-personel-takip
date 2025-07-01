@@ -25,21 +25,17 @@ jobs:
       - name: Kodu Kopyala
         uses: actions/checkout@v4
 
-      # --- DEĞİŞİKLİK BURADA ---
-      # Daha güvenilir bir artifact indirme aracı kullanılıyor ve GEREKLİ İZİN ekleniyor.
-      - name: Önceki Veriyi İndir (Artifact)
-        uses: dawidd6/action-download-artifact@v6
+      # --- DEĞİŞİKLİK BURADA: ARTIFACT YERİNE CACHE KULLANILIYOR ---
+      - name: Önceki Veriyi Cache'den Geri Yükle
+        # Bu adım, 'personel-veri-cache' adında bir önbellek arar
+        # ve bulursa içindeki 'rehber_durumu.csv' dosyasını geri yükler.
+        uses: actions/cache@v4
+        id: cache-personel-veri
         with:
-          # Bu iş akışının en son başarılı çalıştırmasından dosyayı indir.
-          workflow: main.yml
-          name: personel-verisi
-          path: .
-          # Bu satır, diğer çalıştırmalara bakma izni verir.
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-        # Eğer artifact bulunamazsa (ilk çalıştırma) hata verme.
-        continue-on-error: true
+          path: rehber_durumu.csv
+          key: personel-veri-cache-v1
 
-      - name: Dosyaları Listele (İndirme Sonrası)
+      - name: Dosyaları Listele (Cache Sonrası)
         run: ls -l
 
       - name: Python'u Kur
@@ -58,11 +54,7 @@ jobs:
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
         run: python "MAU_Rehber - GITHUB.py"
-
-      - name: Güncel Veriyi Yükle (Artifact)
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: personel-verisi
-          path: rehber_durumu.csv
-          if-no-files-found: error
+      
+      # Not: Cache sistemi, 'rehber_durumu.csv' dosyasında bir değişiklik
+      # olduğunda, iş akışı sonunda otomatik olarak güncel halini kaydeder.
+      # Ayrı bir yükleme adımı gerekmez.
