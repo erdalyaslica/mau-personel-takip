@@ -67,7 +67,7 @@ def send_email_report(config, added, removed, stats):
     password = config['password']
     receivers_list = [email.strip() for email in config['receiver_emails'].split(',')]
     today_str = datetime.now().strftime("%d %B %Y %H:%M")
-    subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu - {today_str}"
+    subject = f"Maltepe Üniversitesi Personel Rehberi Değişiklik Raporu (GITHUB) - {today_str}"
     body = f"<h2>Personel Rehberi Raporu ({today_str})</h2>"
     body += "<h3>📊 Genel İstatistikler</h3>"
     body += f"<ul><li><b>Toplam Personel Sayısı:</b> {stats['total_count']}</li></ul>"
