@@ -45,13 +45,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dotenv
 
+
       - name: Betiği Çalıştır
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
           CACHE_HIT: ${{ steps.cache-check.outputs.cache-hit }}
-        run: python "MAU_Rehber - GITHUB.py"
+        run: python "MAU_Rehber - GITHUB.py"  # TIRNAK İÇİNDE ve .py uzantılı
+        
 
       - name: Yeni Veriyi Cache'e Kaydet
         if: always()
