@@ -22,7 +22,7 @@ jobs:
         id: personel-cache
         with:
           path: rehber_durumu.csv
-          key: ${{ runner.os }}-personel-${{ hashFiles('mau_rehber.py') }}
+          key: ${{ runner.os }}-personel-${{ hashFiles('MAU_Rehber - GITHUB.py') }}
           restore-keys: |
             ${{ runner.os }}-personel-
 
@@ -51,11 +51,11 @@ jobs:
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
           CACHE_HIT: ${{ steps.cache-check.outputs.cache-hit }}
-        run: python mau_rehber.py
+        run: python "MAU_Rehber - GITHUB.py"
 
       - name: Yeni Veriyi Cache'e Kaydet
         if: always()
         uses: actions/cache/save@v4
         with:
           path: rehber_durumu.csv
-          key: ${{ runner.os }}-personel-${{ hashFiles('mau_rehber.py') }}
+          key: ${{ runner.os }}-personel-${{ hashFiles('MAU_Rehber - GITHUB.py') }}
