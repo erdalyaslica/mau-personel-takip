@@ -100,7 +100,6 @@ def extract_data_via_api():
             data = response.json()
             if data.get("Data"):
                 letter_results = data["Data"]
-                # logging.info(f"'{letter}' harfi için {len(letter_results)} sonuç bulundu.")
                 for person in letter_results:
                     ad_soyad = f"{person.get('Adi', '')} {person.get('Soyadi', '')}".strip()
                     birim = person.get('BirimAdi', 'Birim Bilgisi Yok').split('|')[0].strip()
@@ -110,7 +109,7 @@ def extract_data_via_api():
                         all_results.append({'Ad Soyad': ad_soyad, 'Birim': birim})
             else:
                 logging.warning(f"'{letter}' harfi için veri bulunamadı.")
-            time.sleep(0.5) # İstekler arasında kısa bir bekleme
+            time.sleep(0.5)
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"API isteği sırasında bir hata oluştu: {e}")
 
@@ -122,7 +121,6 @@ def compare_lists(previous_list, current_list):
     previous_ids = {get_id(p) for p in previous_list}
     current_ids = {get_id(p) for p in current_list}
     
-    # --- YENİ TEŞHİS LOGLARI ---
     logging.info(f"Karşılaştırma: Önceki listede {len(previous_ids)} kayıt, güncel listede {len(current_ids)} kayıt var.")
     
     added_ids = current_ids - previous_ids
@@ -145,8 +143,12 @@ def main():
     
     try:
         previous_results = []
+        # --- YENİ TEŞHİS LOGLARI ---
+        logging.info(f"Mevcut çalışma dizini: {os.getcwd()}")
+        logging.info(f"Kontrol edilen dosya yolu: {os.path.abspath(PERSISTENT_FILE)}")
+        
         if os.path.exists(PERSISTENT_FILE):
-            logging.info(f"Önceki personel listesi okunuyor: {PERSISTENT_FILE}")
+            logging.info(f"Önceki personel listesi ({PERSISTENT_FILE}) bulundu. Okunuyor...")
             try:
                 with open(PERSISTENT_FILE, "r", newline="", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
