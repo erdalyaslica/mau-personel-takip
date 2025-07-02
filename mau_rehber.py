@@ -18,7 +18,7 @@ HEADERS = {
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest"
 }
-LETTERS = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
+LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
 
 def setup_logging():
     """Loglama sistemini ayarlar"""
