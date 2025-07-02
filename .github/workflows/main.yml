@@ -53,7 +53,7 @@ jobs:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
-        run: python "MAU_Rehber - GITHUB.py"
+        run: python "mau_rehber.py"
       
       # Not: Cache sistemi, 'rehber_durumu.csv' dosyasında bir değişiklik
       # olduğunda, iş akışı sonunda otomatik olarak güncel halini kaydeder.
