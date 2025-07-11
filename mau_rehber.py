@@ -22,6 +22,9 @@ LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
 
 def setup_logging():
     """Loglama sistemini ayarlar"""
+    # Eski log handler'larını temizleyerek tekrar tekrar eklenmesini önle
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -102,7 +105,7 @@ def fetch_personnel_data():
 
 def compare_lists(old_list, new_list):
     """İki listeyi karşılaştırır"""
-    def get_key(p): return f"{p['Ad Soyad']}|{p['Birim']}"
+    def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
     
     old_keys = {get_key(p) for p in old_list}
     new_keys = {get_key(p) for p in new_list}
@@ -122,13 +125,13 @@ def generate_report(added, removed, total):
     
     if added:
         report += "<h3>Yeni Eklenenler</h3><ul>" + \
-                 "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added) + \
-                 "</ul>"
+                  "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added) + \
+                  "</ul>"
     
     if removed:
         report += "<h3>Çıkarılanlar</h3><ul>" + \
-                 "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed) + \
-                 "</ul>"
+                  "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed) + \
+                  "</ul>"
     
     return report
 
@@ -144,16 +147,19 @@ def main():
     try:
         # Önceki verileri yükle
         previous_data = []
-        cache_hit = os.getenv('CACHE_HIT', 'false').lower() == 'true'
+        is_first_run = not os.path.exists(PERSISTENT_FILE)
         
-        if cache_hit and os.path.exists(PERSISTENT_FILE):
+        if not is_first_run:
             try:
                 with open(PERSISTENT_FILE, 'r', encoding='utf-8') as f:
                     previous_data = list(csv.DictReader(f))
                 logging.info(f"Önceki veri yüklendi ({len(previous_data)} kayıt)")
             except Exception as e:
                 logging.error(f"Önceki veri yüklenemedi: {str(e)}")
-        
+                is_first_run = True # Dosya okunamıyorsa, ilk çalıştırma gibi davran
+        else:
+            logging.warning("Önceki veri dosyası bulunamadı. Bu ilk çalıştırma olabilir.")
+
         # Yeni verileri al
         current_data = fetch_personnel_data()
         if not current_data:
@@ -162,11 +168,16 @@ def main():
         # Karşılaştırma yap
         added, removed = compare_lists(previous_data, current_data)
         
-        # Rapor oluştur ve gönder
-        if added or removed or not cache_hit:
+        # --- DÜZELTİLMİŞ MANTIK ---
+        # Sadece değişiklik varsa VEYA bu ilk çalıştırma ise e-posta gönder.
+        if added or removed or is_first_run:
             subject = "Personel Rehberi Güncellemesi"
-            if not cache_hit:
-                subject += " (İlk Çalıştırma)"
+            if is_first_run:
+                subject += " (İlk Çalıştırma Raporu)"
+                # İlk çalıştırmada herkes yeni eklenmiş gibi görünür, bu normaldir.
+                # Bu yüzden 'added' listesini güncel liste ile dolduruyoruz.
+                added = current_data
+                removed = []
             
             report = generate_report(added, removed, len(current_data))
             send_email(config, subject, report)
@@ -182,7 +193,7 @@ def main():
         logging.info("İşlem başarıyla tamamlandı")
         
     except Exception as e:
-        logging.error(f"Kritik hata: {str(e)}")
+        logging.error(f"Kritik hata: {str(e)}", exc_info=True)
         if config:
             send_email(config, "Personel Rehberi Hatası", f"<p>Hata oluştu:</p><pre>{str(e)}</pre>")
         sys.exit(1)
