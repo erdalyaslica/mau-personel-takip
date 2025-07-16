@@ -20,7 +20,7 @@ LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
-WAIT_TIMEOUT = 30 # Bekleme süresini 30 saniyeye çıkardık
+WAIT_TIMEOUT = 20 # Bekleme süresi normal seviyeye çekildi
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
@@ -95,34 +95,21 @@ def fetch_personnel_data_with_selenium():
         driver.get(TARGET_URL)
         logging.info(f"Ana sayfa ({TARGET_URL}) açıldı.")
         
-        # === YENİ HATA YAKALAMA BLOGU ===
-        try:
-            # Arama kutusunun görünür olmasını bekle (30 saniye)
-            search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
-                EC.visibility_of_element_located((By.ID, "personel-adi"))
-            )
-        except TimeoutException as e:
-            # Hata durumunda ekran görüntüsü ve sayfa kaynağını kaydet
-            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'personel-adi' elementi bulunamadı.")
-            screenshot_path = "timeout_screenshot.png"
-            html_path = "timeout_page_source.html"
-            
-            driver.save_screenshot(screenshot_path)
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(driver.page_source)
-            
-            logging.error(f"Ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
-            logging.error(f"Sayfa kaynağı '{html_path}' olarak kaydedildi.")
-            # Hatayı tekrar fırlatarak programın durmasını sağla
-            raise e
-        # ==================================
+        # === DÜZELTİLMİŞ BÖLÜM ===
+        # Arama kutusunu DOĞRU ID ile bekle: "search-key"
+        search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
+            EC.visibility_of_element_located((By.ID, "search-key"))
+        )
+        search_button = driver.find_element(By.ID, "search-button") # Bu ID doğruydu
+        # ==========================
 
         for letter in LETTERS:
             try:
                 logging.info(f"'{letter}' harfi için arama yapılıyor...")
                 search_box.clear()
                 search_box.send_keys(letter)
-                driver.find_element(By.ID, "search-button").click()
+                search_button.click()
+                
                 WebDriverWait(driver, WAIT_TIMEOUT).until(
                     EC.invisibility_of_element_located((By.CLASS_NAME, "spinner-border"))
                 )
@@ -152,7 +139,7 @@ def fetch_personnel_data_with_selenium():
     logging.info(f"Toplam {len(personnel)} benzersiz personel kaydı alındı.")
     return personnel
 
-# main, compare_lists ve generate_report fonksiyonları aynı kalacak
+
 def compare_lists(old_list, new_list):
     """İki listeyi karşılaştırarak eklenen ve çıkarılanları bulur."""
     def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
@@ -240,7 +227,6 @@ def main():
         logging.info(f"Yeni veriler '{PERSISTENT_FILE}' dosyasına başarıyla kaydedildi.")
         
     except Exception as e:
-        # Hata mesajını e-posta ile gönder
         error_message = f"<h3>Betiğin çalışması sırasında beklenmedik bir hata oluştu:</h3><pre>{str(e)}</pre>"
         logging.critical(f"Ana işlem bloğunda beklenmedik bir hata oluştu: {str(e)}", exc_info=True)
         send_email(config, "Personel Rehberi Kritik Hatası", error_message)
