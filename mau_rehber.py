@@ -13,11 +13,15 @@ import time
 LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 API_URL = "https://rehber.maltepe.edu.tr/rehber/Home/GetPerson"
+# mau_rehber.py dosyasındaki ilgili bölüm
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest"
+    "X-Requested-With": "XMLHttpRequest",
+    "Referer": "https://rehber.maltepe.edu.tr/" # Bu satırı ekleyin
 }
+
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
 
 def setup_logging():
