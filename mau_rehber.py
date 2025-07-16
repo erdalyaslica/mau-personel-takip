@@ -237,4 +237,19 @@ def main():
         with open(PERSISTENT_FILE, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['Ad Soyad', 'Birim'])
             writer.writeheader()
-            writer.
+            writer.writerows(current_data)
+        
+        logging.info(f"Yeni veriler '{PERSISTENT_FILE}' dosyasına başarıyla kaydedildi.")
+        
+    except Exception as e:
+        error_message = f"<h3>Betiğin çalışması sırasında beklenmedik bir hata oluştu:</h3><pre>{str(e)}</pre>"
+        logging.critical(f"Ana işlem bloğunda beklenmedik bir hata oluştu: {str(e)}", exc_info=False) # exc_info=False e-postayı temiz tutar
+        if config:
+            send_email(config, "Personel Rehberi Kritik Hatası", error_message)
+        sys.exit(1)
+    finally:
+        logging.info("İşlem tamamlandı.")
+        logging.info("="*50)
+
+if __name__ == "__main__":
+    main()
