@@ -21,7 +21,7 @@ PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
 # CAPTCHA'nın çözülmesi için uzun bekleme süresini koruyoruz.
-WAIT_TIMEOUT = 180 
+WAIT_TIMEOUT = 20 
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
