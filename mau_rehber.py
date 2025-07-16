@@ -20,7 +20,8 @@ LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
-WAIT_TIMEOUT = 30 # Bekleme süresi
+# CAPTCHA ve yavaş yüklemeler için bekleme süresi
+WAIT_TIMEOUT = 90 
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
@@ -88,38 +89,50 @@ def fetch_personnel_data_with_selenium():
     
     try:
         driver.get(TARGET_URL)
-        logging.info(f"Ana sayfa ({TARGET_URL}) açıldı.")
+        logging.info(f"Ana sayfa ({TARGET_URL}) açıldı. CAPTCHA ve sayfa yüklemesi için bekleniyor...")
         
-        # === YENİ VE EN ÖNEMLİ ADIM: Çerezleri Kabul Etme ===
+        # 1. Adım: Varsa Çerez Banner'ını Kabul Et
         try:
             logging.info("Çerez onayı butonu aranıyor...")
-            # HTML dosyasına göre butonun ID'si "cookie-accept"
             accept_button = WebDriverWait(driver, 15).until(
                 EC.element_to_be_clickable((By.ID, "cookie-accept"))
             )
             accept_button.click()
             logging.info("Çerez onayı butonu tıklandı.")
         except TimeoutException:
-            # Eğer çerez onayı çıkmazsa (örneğin sonraki ziyaretlerde), hata verme ve devam et.
-            logging.warning("Çerez onayı butonu bulunamadı veya zaman aşımına uğradı. Devam ediliyor...")
-        # ======================================================
-
-        logging.info("Arama kutusu aranıyor...")
-        search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
-            EC.visibility_of_element_located((By.ID, "search-key"))
-        )
-        search_button = driver.find_element(By.ID, "search-button")
-        logging.info("Arama kutusu bulundu.")
+            logging.warning("Çerez onayı butonu çıkmadı veya zaman aşımına uğradı. Devam ediliyor.")
+        
+        # 2. Adım: Arama kutusunu bekle (HATA AYIKLAMA İLE)
+        try:
+            logging.info(f"Ana arama kutusunun yüklenmesi için {WAIT_TIMEOUT} saniye kadar bekleniyor...")
+            search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
+                EC.visibility_of_element_located((By.ID, "search-key"))
+            )
+            search_button = driver.find_element(By.ID, "search-button")
+            logging.info("Arama kutusu başarıyla bulundu. Veri çekme işlemine başlanıyor.")
+        except TimeoutException as e:
+            # Hata durumunda kanıt topla!
+            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'search-key' elementi bulunamadı.")
+            screenshot_path = "hata_ekran_goruntusu.png"
+            html_path = "hata_sayfa_kaynagi.html"
+            
+            driver.save_screenshot(screenshot_path)
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            
+            logging.error(f"Ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
+            logging.error(f"Sayfa kaynağı '{html_path}' olarak kaydedildi.")
+            raise e # Hatayı tekrar fırlatarak betiği durdur ve e-posta gönderilmesini sağla
 
         for letter in LETTERS:
             try:
-                logging.info(f"'{letter}' harfi için arama yapılıyor...")
+                search_box = driver.find_element(By.ID, "search-key")
+                search_button = driver.find_element(By.ID, "search-button")
                 search_box.clear()
                 search_box.send_keys(letter)
                 search_button.click()
                 
-                # Arama sonuçlarının yüklenmesi için bekleme (spinner'ın kaybolması)
-                WebDriverWait(driver, WAIT_TIMEOUT).until(
+                WebDriverWait(driver, 20).until(
                     EC.invisibility_of_element_located((By.CLASS_NAME, "spinner-border"))
                 )
 
@@ -133,7 +146,7 @@ def fetch_personnel_data_with_selenium():
                             seen_ids.add(person_id)
                             personnel.append({'Ad Soyad': full_name, 'Birim': department})
                     except Exception:
-                        continue # Hatalı kartları atla
+                        continue
                 logging.info(f"'{letter}' harfi için {len(cards)} sonuç işlendi.")
                 time.sleep(0.5)
 
@@ -148,40 +161,24 @@ def fetch_personnel_data_with_selenium():
     logging.info(f"Toplam {len(personnel)} benzersiz personel kaydı alındı.")
     return personnel
 
-
+# Geri kalan fonksiyonlar (compare_lists, generate_report, main) aynı
 def compare_lists(old_list, new_list):
-    """İki listeyi karşılaştırarak eklenen ve çıkarılanları bulur."""
     def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
-    
     old_keys = {get_key(p) for p in old_list}
     new_keys = {get_key(p) for p in new_list}
-    
     added = [p for p in new_list if get_key(p) not in old_keys]
     removed = [p for p in old_list if get_key(p) not in new_keys]
-    
     return added, removed
 
 def generate_report(added, removed, total):
-    """HTML formatında rapor oluşturur."""
     date_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-    report = f"""
-    <h2>Personel Rehberi Raporu ({date_str})</h2>
-    <p><b>Toplam Personel Sayısı:</b> {total}</p>
-    """
-    
+    report = f"<h2>Personel Rehberi Raporu ({date_str})</h2><p><b>Toplam Personel Sayısı:</b> {total}</p>"
     if added:
-        report += "<h3>Yeni Eklenen Personeller</h3><ul>" + \
-                  "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added) + \
-                  "</ul>"
-    
+        report += "<h3>Yeni Eklenen Personeller</h3><ul>" + "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in added) + "</ul>"
     if removed:
-        report += "<h3>Ayrılan Personeller</h3><ul>" + \
-                  "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed) + \
-                  "</ul>"
-
+        report += "<h3>Ayrılan Personeller</h3><ul>" + "".join(f"<li>{p['Ad Soyad']} - {p['Birim']}</li>" for p in removed) + "</ul>"
     if not added and not removed:
         report += "<p>Herhangi bir değişiklik tespit edilmedi.</p>"
-        
     return report
     
 def main():
@@ -211,7 +208,7 @@ def main():
         current_data = fetch_personnel_data_with_selenium()
         if not current_data:
             logging.error("Selenium ile veri çekme işlemi başarısız oldu, hiç kayıt alınamadı.")
-            send_email(config, "Personel Rehberi Hatası", "<p>Kritik hata: Web sitesinden hiçbir personel verisi çekilemedi.</p>")
+            send_email(config, "Personel Rehberi Hatası", "<p>Kritik hata: Web sitesinden hiçbir personel verisi çekilemedi. Olası sebep CAPTCHA veya sayfa yapısı değişikliği.</p>")
             sys.exit(1)
         
         added, removed = compare_lists(previous_data, current_data)
