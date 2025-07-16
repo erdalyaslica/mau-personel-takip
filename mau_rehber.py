@@ -13,13 +13,14 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
 # --- SABİTLER ---
 LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
-
+WAIT_TIMEOUT = 30 # Bekleme süresini 30 saniyeye çıkardık
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
@@ -78,17 +79,14 @@ def fetch_personnel_data_with_selenium():
     seen_ids = set()
 
     options = uc.ChromeOptions()
-    options.add_argument('--headless')  # Tarayıcıyı arayüz olmadan çalıştırır
+    options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     
-    # GitHub Actions ortamında çalışmak için özel ayarlar
     if 'GITHUB_ACTIONS' in os.environ:
         logging.info("GitHub Actions ortamı algılandı. Headless modda çalışılıyor.")
     else:
         logging.info("Lokal ortamda çalışılıyor.")
-        # Lokal'de headless olmadan da test edebilirsiniz.
-        # options.headless = False 
         
     driver = uc.Chrome(options=options, use_subprocess=False)
     logging.info("Chrome sürücüsü başlatıldı.")
@@ -96,48 +94,56 @@ def fetch_personnel_data_with_selenium():
     try:
         driver.get(TARGET_URL)
         logging.info(f"Ana sayfa ({TARGET_URL}) açıldı.")
-
-        # Sayfanın yüklenmesini ve arama kutusunun görünür olmasını bekle
-        search_box = WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.ID, "personel-adi"))
-        )
         
+        # === YENİ HATA YAKALAMA BLOGU ===
+        try:
+            # Arama kutusunun görünür olmasını bekle (30 saniye)
+            search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
+                EC.visibility_of_element_located((By.ID, "personel-adi"))
+            )
+        except TimeoutException as e:
+            # Hata durumunda ekran görüntüsü ve sayfa kaynağını kaydet
+            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'personel-adi' elementi bulunamadı.")
+            screenshot_path = "timeout_screenshot.png"
+            html_path = "timeout_page_source.html"
+            
+            driver.save_screenshot(screenshot_path)
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            
+            logging.error(f"Ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
+            logging.error(f"Sayfa kaynağı '{html_path}' olarak kaydedildi.")
+            # Hatayı tekrar fırlatarak programın durmasını sağla
+            raise e
+        # ==================================
+
         for letter in LETTERS:
             try:
                 logging.info(f"'{letter}' harfi için arama yapılıyor...")
                 search_box.clear()
                 search_box.send_keys(letter)
-
-                # Arama butonuna tıkla
                 driver.find_element(By.ID, "search-button").click()
-
-                # Sonuçların yüklenmesini bekle (spinner kaybolana kadar)
-                WebDriverWait(driver, 20).until(
+                WebDriverWait(driver, WAIT_TIMEOUT).until(
                     EC.invisibility_of_element_located((By.CLASS_NAME, "spinner-border"))
                 )
 
-                # Sonuç kartlarını bul
                 cards = driver.find_elements(By.CLASS_NAME, "card-body")
-                
                 for card in cards:
                     try:
                         full_name = card.find_element(By.CLASS_NAME, "card-title").text.strip()
                         department = card.find_element(By.CLASS_NAME, "card-text").text.split('|')[0].strip()
-                        
                         person_id = f"{full_name}|{department}"
                         if person_id not in seen_ids:
                             seen_ids.add(person_id)
                             personnel.append({'Ad Soyad': full_name, 'Birim': department})
                     except Exception:
-                        # Bazen boş kartlar olabilir, onları atla
                         continue
-                
                 logging.info(f"'{letter}' harfi için {len(cards)} sonuç işlendi.")
-                time.sleep(0.5) # Sunucuyu yormamak için küçük bir bekleme
+                time.sleep(0.5)
 
             except Exception as e:
                 logging.error(f"'{letter}' harfi işlenirken bir hata oluştu: {str(e)}")
-                continue # Bir harfte hata olursa diğerine geç
+                continue
     
     finally:
         driver.quit()
@@ -146,7 +152,7 @@ def fetch_personnel_data_with_selenium():
     logging.info(f"Toplam {len(personnel)} benzersiz personel kaydı alındı.")
     return personnel
 
-
+# main, compare_lists ve generate_report fonksiyonları aynı kalacak
 def compare_lists(old_list, new_list):
     """İki listeyi karşılaştırarak eklenen ve çıkarılanları bulur."""
     def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
@@ -181,7 +187,7 @@ def generate_report(added, removed, total):
         report += "<p>Herhangi bir değişiklik tespit edilmedi.</p>"
         
     return report
-
+    
 def main():
     setup_logging()
     logging.info("="*50)
@@ -208,7 +214,6 @@ def main():
 
         current_data = fetch_personnel_data_with_selenium()
         if not current_data:
-            # Bu sefer hata fırlatmak yerine, veri alınamadığını bildiren bir e-posta gönderelim.
             logging.error("Selenium ile veri çekme işlemi başarısız oldu, hiç kayıt alınamadı.")
             send_email(config, "Personel Rehberi Hatası", "<p>Kritik hata: Web sitesinden hiçbir personel verisi çekilemedi.</p>")
             sys.exit(1)
@@ -220,7 +225,7 @@ def main():
             if is_first_run:
                 subject += " (İlk Çalıştırma Raporu)"
                 added = current_data
-                removed = [] # İlk çalıştırmada ayrılan olmaz.
+                removed = []
             
             report = generate_report(added, removed, len(current_data))
             send_email(config, subject, report)
@@ -235,8 +240,10 @@ def main():
         logging.info(f"Yeni veriler '{PERSISTENT_FILE}' dosyasına başarıyla kaydedildi.")
         
     except Exception as e:
+        # Hata mesajını e-posta ile gönder
+        error_message = f"<h3>Betiğin çalışması sırasında beklenmedik bir hata oluştu:</h3><pre>{str(e)}</pre>"
         logging.critical(f"Ana işlem bloğunda beklenmedik bir hata oluştu: {str(e)}", exc_info=True)
-        send_email(config, "Personel Rehberi Kritik Hatası", f"<h3>Betiğin çalışması sırasında beklenmedik bir hata oluştu:</h3><pre>{str(e)}</pre>")
+        send_email(config, "Personel Rehberi Kritik Hatası", error_message)
         sys.exit(1)
     finally:
         logging.info("İşlem tamamlandı.")
