@@ -20,8 +20,7 @@ LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
-# Bekleme süresini, olası yavaş yüklemelere karşı artırıyoruz.
-WAIT_TIMEOUT = 60 
+WAIT_TIMEOUT = 30 # Bekleme süresi
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
@@ -83,7 +82,6 @@ def fetch_personnel_data_with_selenium():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080') # Ekran boyutunu büyütelim
     
     driver = uc.Chrome(options=options, use_subprocess=False)
     logging.info("Chrome sürücüsü başlatıldı.")
@@ -92,28 +90,26 @@ def fetch_personnel_data_with_selenium():
         driver.get(TARGET_URL)
         logging.info(f"Ana sayfa ({TARGET_URL}) açıldı.")
         
-        # === YENİ HATA YAKALAMA BLOGU ===
+        # === YENİ VE EN ÖNEMLİ ADIM: Çerezleri Kabul Etme ===
         try:
-            # Arama kutusunun görünür olmasını bekle (60 saniye)
-            search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
-                EC.visibility_of_element_located((By.ID, "search-key"))
+            logging.info("Çerez onayı butonu aranıyor...")
+            # HTML dosyasına göre butonun ID'si "cookie-accept"
+            accept_button = WebDriverWait(driver, 15).until(
+                EC.element_to_be_clickable((By.ID, "cookie-accept"))
             )
-        except TimeoutException as e:
-            # Hata durumunda kanıt topla!
-            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'search-key' elementi bulunamadı.")
-            screenshot_path = "hata_ekran_goruntusu.png"
-            html_path = "hata_sayfa_kaynagi.html"
-            
-            driver.save_screenshot(screenshot_path)
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(driver.page_source)
-            
-            logging.error(f"Ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
-            logging.error(f"Sayfa kaynağı '{html_path}' olarak kaydedildi.")
-            raise e
-        # ==================================
+            accept_button.click()
+            logging.info("Çerez onayı butonu tıklandı.")
+        except TimeoutException:
+            # Eğer çerez onayı çıkmazsa (örneğin sonraki ziyaretlerde), hata verme ve devam et.
+            logging.warning("Çerez onayı butonu bulunamadı veya zaman aşımına uğradı. Devam ediliyor...")
+        # ======================================================
 
+        logging.info("Arama kutusu aranıyor...")
+        search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
+            EC.visibility_of_element_located((By.ID, "search-key"))
+        )
         search_button = driver.find_element(By.ID, "search-button")
+        logging.info("Arama kutusu bulundu.")
 
         for letter in LETTERS:
             try:
@@ -122,6 +118,7 @@ def fetch_personnel_data_with_selenium():
                 search_box.send_keys(letter)
                 search_button.click()
                 
+                # Arama sonuçlarının yüklenmesi için bekleme (spinner'ın kaybolması)
                 WebDriverWait(driver, WAIT_TIMEOUT).until(
                     EC.invisibility_of_element_located((By.CLASS_NAME, "spinner-border"))
                 )
@@ -136,7 +133,7 @@ def fetch_personnel_data_with_selenium():
                             seen_ids.add(person_id)
                             personnel.append({'Ad Soyad': full_name, 'Birim': department})
                     except Exception:
-                        continue
+                        continue # Hatalı kartları atla
                 logging.info(f"'{letter}' harfi için {len(cards)} sonuç işlendi.")
                 time.sleep(0.5)
 
@@ -151,8 +148,7 @@ def fetch_personnel_data_with_selenium():
     logging.info(f"Toplam {len(personnel)} benzersiz personel kaydı alındı.")
     return personnel
 
-# Diğer fonksiyonlar (compare_lists, generate_report, main) aynı kalabilir
-# main fonksiyonu
+
 def compare_lists(old_list, new_list):
     """İki listeyi karşılaştırarak eklenen ve çıkarılanları bulur."""
     def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
@@ -187,11 +183,11 @@ def generate_report(added, removed, total):
         report += "<p>Herhangi bir değişiklik tespit edilmedi.</p>"
         
     return report
-
+    
 def main():
     setup_logging()
     logging.info("="*50)
-    logging.info("Selenium tabanlı personel rehber kontrolü başlatıldı (Hata Ayıklama Modu).")
+    logging.info("Selenium tabanlı personel rehber kontrolü başlatıldı.")
     
     config = load_config()
     if not config:
@@ -215,8 +211,7 @@ def main():
         current_data = fetch_personnel_data_with_selenium()
         if not current_data:
             logging.error("Selenium ile veri çekme işlemi başarısız oldu, hiç kayıt alınamadı.")
-            if config:
-                send_email(config, "Personel Rehberi Hatası", "<p>Kritik hata: Web sitesinden hiçbir personel verisi çekilemedi.</p>")
+            send_email(config, "Personel Rehberi Hatası", "<p>Kritik hata: Web sitesinden hiçbir personel verisi çekilemedi.</p>")
             sys.exit(1)
         
         added, removed = compare_lists(previous_data, current_data)
@@ -229,8 +224,7 @@ def main():
                 removed = []
             
             report = generate_report(added, removed, len(current_data))
-            if config:
-                send_email(config, subject, report)
+            send_email(config, subject, report)
         else:
             logging.info("Rehberde herhangi bir değişiklik yok, e-posta gönderilmedi.")
         
@@ -243,9 +237,8 @@ def main():
         
     except Exception as e:
         error_message = f"<h3>Betiğin çalışması sırasında beklenmedik bir hata oluştu:</h3><pre>{str(e)}</pre>"
-        logging.critical(f"Ana işlem bloğunda beklenmedik bir hata oluştu: {str(e)}", exc_info=False) # exc_info=False e-postayı temiz tutar
-        if config:
-            send_email(config, "Personel Rehberi Kritik Hatası", error_message)
+        logging.critical(f"Ana işlem bloğunda beklenmedik bir hata oluştu: {str(e)}", exc_info=True)
+        send_email(config, "Personel Rehberi Kritik Hatası", error_message)
         sys.exit(1)
     finally:
         logging.info("İşlem tamamlandı.")
