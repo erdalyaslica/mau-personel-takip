@@ -43,9 +43,10 @@ jobs:
       - name: Gerekli Paketleri Yükle
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt # requirements.txt dosyasındaki her şeyi yükle
+          pip install -r requirements.txt
 
       - name: Betiği Çalıştır
+        id: calistir
         env:
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
@@ -60,3 +61,15 @@ jobs:
           name: personel-verisi
           path: rehber_durumu.csv
           retention-days: 7
+      
+      # === YENİ ADIM: Hata Ayıklama Dosyalarını Yükle ===
+      # Bu adım, SADECE bir önceki 'Betiği Çalıştır' adımı başarısız olursa çalışır.
+      - name: Hata Ayıklama Dosyalarını Yükle
+        if: failure() && steps.calistir.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hata-teshis-dosyalari
+          path: |
+            hata_ekran_goruntusu.png
+            hata_sayfa_kaynagi.html
+          if-no-files-found: ignore
