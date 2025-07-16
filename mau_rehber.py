@@ -20,8 +20,8 @@ LOG_FILE = 'personel_rehber.log'
 PERSISTENT_FILE = "rehber_durumu.csv"
 TARGET_URL = "https://rehber.maltepe.edu.tr/"
 LETTERS = "ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ"
-# CAPTCHA ve yavaş yüklemeler için bekleme süresi
-WAIT_TIMEOUT = 90 
+# CAPTCHA'nın çözülmesi için bekleme süresini maksimuma çıkarıyoruz.
+WAIT_TIMEOUT = 180 
 
 def setup_logging():
     """Loglama sistemini ayarlar."""
@@ -83,9 +83,13 @@ def fetch_personnel_data_with_selenium():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    # === YENİ GİZLİLİK AYARLARI ===
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
     
-    driver = uc.Chrome(options=options, use_subprocess=False)
-    logging.info("Chrome sürücüsü başlatıldı.")
+    driver = uc.Chrome(options=options, use_subprocess=True)
+    logging.info("Chrome sürücüsü (ek ayarlar ile) başlatıldı.")
     
     try:
         driver.get(TARGET_URL)
@@ -108,11 +112,9 @@ def fetch_personnel_data_with_selenium():
             search_box = WebDriverWait(driver, WAIT_TIMEOUT).until(
                 EC.visibility_of_element_located((By.ID, "search-key"))
             )
-            search_button = driver.find_element(By.ID, "search-button")
             logging.info("Arama kutusu başarıyla bulundu. Veri çekme işlemine başlanıyor.")
         except TimeoutException as e:
-            # Hata durumunda kanıt topla!
-            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'search-key' elementi bulunamadı.")
+            logging.error(f"Sayfa {WAIT_TIMEOUT} saniyede yüklenemedi veya 'search-key' elementi bulunamadı. Bu genellikle çözülemeyen bir CAPTCHA sorunudur.")
             screenshot_path = "hata_ekran_goruntusu.png"
             html_path = "hata_sayfa_kaynagi.html"
             
@@ -120,9 +122,8 @@ def fetch_personnel_data_with_selenium():
             with open(html_path, "w", encoding="utf-8") as f:
                 f.write(driver.page_source)
             
-            logging.error(f"Ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
-            logging.error(f"Sayfa kaynağı '{html_path}' olarak kaydedildi.")
-            raise e # Hatayı tekrar fırlatarak betiği durdur ve e-posta gönderilmesini sağla
+            logging.error(f"Teşhis için ekran görüntüsü '{screenshot_path}' olarak kaydedildi.")
+            raise e
 
         for letter in LETTERS:
             try:
@@ -161,7 +162,8 @@ def fetch_personnel_data_with_selenium():
     logging.info(f"Toplam {len(personnel)} benzersiz personel kaydı alındı.")
     return personnel
 
-# Geri kalan fonksiyonlar (compare_lists, generate_report, main) aynı
+
+# Geri kalan fonksiyonlar aynıdır
 def compare_lists(old_list, new_list):
     def get_key(p): return f"{p.get('Ad Soyad', 'None')}|{p.get('Birim', 'None')}"
     old_keys = {get_key(p) for p in old_list}
