@@ -2,6 +2,12 @@ name: Personel Rehber Kontrolü
 
 on:
   workflow_dispatch:
+    inputs:
+      send_test_email:
+        description: "Yalnızca test e-postası gönder (rehberi taramaz)"
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "10 6 * * 1-5" # Hafta içi 09:10 Türkiye saati
 
@@ -39,6 +45,7 @@ jobs:
           RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_ALLOWED_CHAT_ID: ${{ secrets.TG_ALLOWED_CHAT_ID }}
+          SEND_TEST_EMAIL: ${{ inputs.send_test_email || 'false' }}
         run: python mau_rehber.py
 
       - name: Güncel personel listesini sakla
