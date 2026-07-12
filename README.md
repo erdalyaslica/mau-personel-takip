@@ -7,22 +7,17 @@ Maltepe Üniversitesi personel rehberini hafta içi her sabah kontrol eder. Yeni
 - Rehber API'si Scrape.do üzerinden sorgulanır; Selenium/Chrome kullanılmaz.
 - Altı sesli harfle alınan sonuçlar e-posta, ad-soyad ve birim bilgisine göre tekilleştirilir.
 - Eksik tarama veya 50'den az kayıt durumunda mevcut liste değiştirilmez.
+- Güncel liste `rehber_durumu.csv` adıyla deponun Code/Files bölümünde tutulur.
+- Her taramada site verisi bu CSV ile karşılaştırılır; değişiklik varsa bildirim gönderilir ve CSV güncellenir.
+- CSV ayrıca ilgili Actions çalışmasında 30 gün indirilebilir dosya olarak sunulur.
 - İlk çalışmada güncel liste başlangıç verisi olarak saklanır ve toplu “yeni personel” bildirimi gönderilmez.
-- Sonraki çalışmalarda yalnızca değişiklik varsa bildirim gönderilir.
+
+## Kontrollü test
+
+`rehber_durumu.csv` içinden bir satırı silip değişikliği doğrudan `main` dalına kaydedin. Ardından normal workflow çalıştırın. Silinen kişi “yeni katılan” olarak bildirilir ve otomasyon CSV dosyasını doğru hâline getirir.
 
 ## GitHub Secrets
 
-Repository **Settings → Secrets and variables → Actions** bölümüne şunları ekleyin:
+Repository **Settings → Secrets and variables → Actions** bölümüne `SCRAPEDO_TOKEN`, `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAILS` ve isteğe bağlı olarak `TG_TOKEN`, `TG_ALLOWED_CHAT_ID` eklenmelidir.
 
-| Secret | Zorunlu | Açıklama |
-|---|---:|---|
-| `SCRAPEDO_TOKEN` | Evet | Scrape.do API anahtarı |
-| `SENDER_EMAIL` | Evet | Gönderen Gmail adresi |
-| `SENDER_PASSWORD` | Evet | Gmail uygulama şifresi |
-| `RECEIVER_EMAILS` | Evet | Virgülle ayrılmış alıcılar |
-| `TG_TOKEN` | Hayır | Telegram bot tokenı |
-| `TG_ALLOWED_CHAT_ID` | Hayır | Bildirim gönderilecek sohbet kimliği |
-
-İş akışı **Actions → Personel Rehber Kontrolü → Run workflow** ile elle denenebilir. Zamanlama hafta içi Türkiye saatiyle 09:10'dur (GitHub yoğunluğuna göre birkaç dakika gecikebilir).
-
-Yerelde çalıştırmak için ortam değişkenlerini ayarlayıp `pip install -r requirements.txt` ve ardından `python mau_rehber.py` komutlarını kullanın.
+İş akışı **Actions → Personel Rehber Kontrolü → Run workflow** ile elle denenebilir. Zamanlama hafta içi Türkiye saatiyle 09:10'dur.

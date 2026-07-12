@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   monitor:
@@ -30,7 +30,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      - name: Önceki personel listesini yükle
+      - name: Geçiş için önceki listeyi cache'den yükle
+        if: hashFiles('rehber_durumu.csv') == ''
         uses: actions/cache/restore@v4
         with:
           path: rehber_durumu.csv
@@ -48,12 +49,18 @@ jobs:
           SEND_TEST_EMAIL: ${{ inputs.send_test_email || 'false' }}
         run: python mau_rehber.py
 
-      - name: Güncel personel listesini sakla
-        if: success()
-        uses: actions/cache/save@v4
-        with:
-          path: rehber_durumu.csv
-          key: personel-state-${{ github.run_id }}
+      - name: Güncel listeyi Files bölümüne kaydet
+        if: success() && hashFiles('rehber_durumu.csv') != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rehber_durumu.csv
+          if git diff --cached --quiet; then
+            echo "Personel listesinde dosya değişikliği yok."
+          else
+            git commit -m "Personel listesini güncelle"
+            git push
+          fi
 
       - name: İndirilebilir personel listesini yayınla
         if: success() && hashFiles('rehber_durumu.csv') != ''
