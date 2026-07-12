@@ -127,20 +127,55 @@ def compare(old, new):
     return [p for k, p in new_map.items() if k not in old_map], [p for k, p in old_map.items() if k not in new_map]
 
 
+def email_shell(eyebrow, title, subtitle, content, accent="#0071e3"):
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#1d1d1f;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f5f7;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:720px;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.08);">
+<tr><td style="height:6px;background:{accent};font-size:0;">&nbsp;</td></tr>
+<tr><td style="padding:44px 44px 26px;">
+<div style="font-size:12px;line-height:18px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:{accent};">{eyebrow}</div>
+<h1 style="margin:10px 0 12px;font-size:34px;line-height:40px;letter-spacing:-.7px;font-weight:700;color:#1d1d1f;">{title}</h1>
+<p style="margin:0;font-size:17px;line-height:26px;color:#6e6e73;">{subtitle}</p>
+</td></tr>
+<tr><td style="padding:0 44px 44px;">{content}</td></tr>
+</table>
+<p style="margin:20px 0 0;font-size:12px;line-height:18px;color:#86868b;">Maltepe Personel Takip · GitHub Actions</p>
+</td></tr></table></body></html>"""
+
+
 def report_html(added, removed, total):
-    def table(title, color, rows):
+    def table(title, color, tint, rows):
         if not rows:
             return ""
         body = "".join(
-            f"<tr><td>{html.escape((p['Ad']+' '+p['Soyad']).strip())}</td><td>{html.escape(p['Birim'])}</td><td>{html.escape(p['Görev'])}</td></tr>"
+            f"""<tr>
+            <td style="padding:15px 12px;border-bottom:1px solid #e8e8ed;font-size:14px;line-height:20px;font-weight:600;color:#1d1d1f;">{html.escape((p['Ad']+' '+p['Soyad']).strip())}</td>
+            <td style="padding:15px 12px;border-bottom:1px solid #e8e8ed;font-size:13px;line-height:19px;color:#515154;">{html.escape(p['Birim'])}</td>
+            <td style="padding:15px 12px;border-bottom:1px solid #e8e8ed;font-size:13px;line-height:19px;color:#515154;">{html.escape(p['Görev'])}</td>
+            </tr>"""
             for p in rows
         )
-        return f"<h3 style='color:{color}'>{title} ({len(rows)})</h3><table style='width:100%;border-collapse:collapse'><tr><th>Ad Soyad</th><th>Birim</th><th>Görev</th></tr>{body}</table>"
-    return f"""<div style='max-width:760px;margin:auto;font-family:Arial;color:#263238'>
-    <h2 style='color:#b23b2a'>Maltepe Üniversitesi Personel Rehberi</h2>
-    <p>{datetime.now().strftime('%d.%m.%Y %H:%M')} itibarıyla toplam <b>{total}</b> personel.</p>
-    {table('Yeni katılanlar', '#16803c', added)}{table('Ayrılanlar', '#b42318', removed)}
-    </div>"""
+        return f"""<div style="margin-top:28px;">
+        <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:{tint};color:{color};font-size:13px;font-weight:700;">{title} · {len(rows)}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;border:1px solid #e8e8ed;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;">
+        <tr style="background:#f5f5f7;"><th style="padding:12px;text-align:left;font-size:11px;letter-spacing:.5px;color:#6e6e73;">AD SOYAD</th><th style="padding:12px;text-align:left;font-size:11px;letter-spacing:.5px;color:#6e6e73;">BİRİM</th><th style="padding:12px;text-align:left;font-size:11px;letter-spacing:.5px;color:#6e6e73;">GÖREV</th></tr>
+        {body}</table></div>"""
+
+    summary = f"""<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:8px 0 4px;">
+    <tr>
+      <td width="33%" style="padding:16px 8px 16px 0;"><div style="padding:18px;border-radius:16px;background:#f5f5f7;"><div style="font-size:28px;font-weight:700;">{total}</div><div style="font-size:12px;color:#6e6e73;">Toplam personel</div></div></td>
+      <td width="33%" style="padding:16px 4px;"><div style="padding:18px;border-radius:16px;background:#edfaF1;"><div style="font-size:28px;font-weight:700;color:#188038;">+{len(added)}</div><div style="font-size:12px;color:#52755d;">Yeni katılan</div></div></td>
+      <td width="33%" style="padding:16px 0 16px 8px;"><div style="padding:18px;border-radius:16px;background:#fff1f0;"><div style="font-size:28px;font-weight:700;color:#d93025;">−{len(removed)}</div><div style="font-size:12px;color:#8f5a56;">Ayrılan</div></div></td>
+    </tr></table>"""
+    content = summary + table("Yeni katılanlar", "#188038", "#eaf7ee", added) + table("Ayrılanlar", "#d93025", "#fff0ef", removed)
+    return email_shell(
+        "Personel Rehberi",
+        "Rehberde değişiklik var.",
+        f"{datetime.now().strftime('%d.%m.%Y %H:%M')} itibarıyla güncel karşılaştırma özeti.",
+        content,
+    )
 
 
 def send_email(subject, body):
@@ -169,12 +204,16 @@ def main():
         if os.getenv("SEND_TEST_EMAIL", "").strip().lower() == "true":
             send_email(
                 "Maltepe Rehber Botu Testi Başarılı",
-                "<div style='font-family:Arial;max-width:680px;margin:auto'>"
-                "<h2 style='color:#16803c'>Test başarılı</h2>"
-                "<p>GitHub Actions, e-posta ayarlarınız ve Gmail uygulama şifreniz düzgün çalışıyor.</p>"
-                f"<p><b>Test zamanı:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}</p>"
-                "<p>Bu test personel listesini değiştirmedi ve Scrape.do kredisi kullanmadı.</p>"
-                "</div>",
+                email_shell(
+                    "Sistem Kontrolü",
+                    "Her şey hazır.",
+                    "GitHub Actions ve e-posta bağlantınız sorunsuz çalışıyor.",
+                    f"""<div style="margin-top:28px;padding:22px;border-radius:18px;background:#f5f5f7;">
+                    <div style="font-size:14px;font-weight:600;color:#1d1d1f;">Test başarıyla tamamlandı</div>
+                    <div style="margin-top:7px;font-size:13px;line-height:20px;color:#6e6e73;">{datetime.now().strftime('%d.%m.%Y %H:%M')} · Personel listesi değiştirilmedi · Scrape.do kredisi kullanılmadı</div>
+                    </div>""",
+                    "#30a14e",
+                ),
             )
             logging.info("Test e-postası gönderildi; rehber taraması yapılmadı.")
             return 0
