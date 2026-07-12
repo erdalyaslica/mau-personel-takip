@@ -1,4 +1,1 @@
-selenium
-webdriver-manager
-python-dotenv
-undetected-chromedriver
+requests==2.32.4
