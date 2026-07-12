@@ -194,8 +194,46 @@ def send_telegram(text):
     token, chat_id = os.getenv("TG_TOKEN", "").strip(), os.getenv("TG_ALLOWED_CHAT_ID", "").strip()
     if not token or not chat_id:
         return
-    response = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=30)
-    response.raise_for_status()
+    chunks, current = [], ""
+    for line in text.splitlines(keepends=True):
+        if len(current) + len(line) > 3800 and current:
+            chunks.append(current.rstrip())
+            current = ""
+        current += line
+    if current:
+        chunks.append(current.rstrip())
+    for chunk in chunks:
+        response = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": chunk},
+            timeout=30,
+        )
+        response.raise_for_status()
+
+
+def telegram_report(added, removed, total):
+    lines = [
+        "📋 Maltepe Rehber Güncellemesi",
+        datetime.now().strftime("🕒 %d.%m.%Y %H:%M"),
+        "",
+        f"🟢 Yeni: {len(added)}  |  🔴 Ayrılan: {len(removed)}  |  👥 Toplam: {total}",
+    ]
+
+    if added:
+        lines.extend(["", f"🟢 YENİ KATILANLAR ({len(added)})"])
+        for person in added:
+            name = (person["Ad"] + " " + person["Soyad"]).strip() or "İsim belirtilmemiş"
+            department = person["Birim"] or "Birim belirtilmemiş"
+            lines.extend([f"• {name}", f"  └ {department}"])
+
+    if removed:
+        lines.extend(["", f"🔴 AYRILANLAR ({len(removed)})"])
+        for person in removed:
+            name = (person["Ad"] + " " + person["Soyad"]).strip() or "İsim belirtilmemiş"
+            department = person["Birim"] or "Birim belirtilmemiş"
+            lines.extend([f"• {name}", f"  └ {department}"])
+
+    return "\n".join(lines)
 
 
 def main():
@@ -226,7 +264,7 @@ def main():
         added, removed = compare(old, current)
         if added or removed:
             send_email("Maltepe Rehber Değişiklik Raporu", report_html(added, removed, len(current)))
-            send_telegram(f"Maltepe Rehber Güncellemesi\nYeni: {len(added)} | Ayrılan: {len(removed)} | Toplam: {len(current)}")
+            send_telegram(telegram_report(added, removed, len(current)))
         else:
             logging.info("Değişiklik yok; bildirim gönderilmedi.")
         save_state(current)
