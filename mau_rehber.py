@@ -166,6 +166,18 @@ def send_telegram(text):
 def main():
     setup_logging()
     try:
+        if os.getenv("SEND_TEST_EMAIL", "").strip().lower() == "true":
+            send_email(
+                "Maltepe Rehber Botu Testi Başarılı",
+                "<div style='font-family:Arial;max-width:680px;margin:auto'>"
+                "<h2 style='color:#16803c'>Test başarılı</h2>"
+                "<p>GitHub Actions, e-posta ayarlarınız ve Gmail uygulama şifreniz düzgün çalışıyor.</p>"
+                f"<p><b>Test zamanı:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}</p>"
+                "<p>Bu test personel listesini değiştirmedi ve Scrape.do kredisi kullanmadı.</p>"
+                "</div>",
+            )
+            logging.info("Test e-postası gönderildi; rehber taraması yapılmadı.")
+            return 0
         old = load_state()
         current = fetch_personnel()
         if not old:
