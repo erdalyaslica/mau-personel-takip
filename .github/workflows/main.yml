@@ -55,6 +55,15 @@ jobs:
           path: rehber_durumu.csv
           key: personel-state-${{ github.run_id }}
 
+      - name: İndirilebilir personel listesini yayınla
+        if: success() && hashFiles('rehber_durumu.csv') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: personel-listesi-${{ github.run_number }}
+          path: rehber_durumu.csv
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Teşhis çıktısını sakla
         if: failure()
         uses: actions/upload-artifact@v4
