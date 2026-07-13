@@ -3,7 +3,7 @@ name: Otomatik Personel Rehber Kontrolü
 on:
   workflow_dispatch:
   schedule:
-    - cron: "45 11 * * 1-5"
+    - cron: "10 15 * * 1-5"
       timezone: "Europe/Istanbul" # Hafta içi 11:45 İstanbul saati
 
 concurrency:
