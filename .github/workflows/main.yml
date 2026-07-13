@@ -9,7 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "30 8 * * 1-5" # Hafta içi 09:10 Türkiye saati
+    - cron: "45 11 * * 1-5"
+      timezone: "Europe/Istanbul" # Hafta içi Türkiye saatiyle 11:45
 
 concurrency:
   group: personel-rehber
