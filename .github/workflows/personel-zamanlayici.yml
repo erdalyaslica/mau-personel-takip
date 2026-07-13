@@ -3,7 +3,9 @@ name: Otomatik Personel Rehber Kontrolü
 on:
   workflow_dispatch:
   schedule:
-    - cron: "59 11 * * 1-5" # Kalıcı: hafta içi 11:45 Türkiye saati
+    # TSİ 11:42 = UTC 08:42 (Hafta içi Pazartesi - Cuma)
+    # Yoğunluktan kaçınmak için tam 45 yerine 42 seçilmiştir.
+    - cron: "59 11 * * 1-5"
 
 concurrency:
   group: personel-rehber
@@ -18,10 +20,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
+          
       - run: pip install -r requirements.txt
 
       - name: Geçiş için önceki listeyi cache'den yükle
