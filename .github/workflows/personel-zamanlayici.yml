@@ -3,9 +3,8 @@ name: Otomatik Personel Rehber Kontrolü
 on:
   workflow_dispatch:
   schedule:
-    # TSİ 11:42 = UTC 08:42 (Hafta içi Pazartesi - Cuma)
-    # Yoğunluktan kaçınmak için tam 45 yerine 42 seçilmiştir.
-    - cron: "59 11 * * 1-5"
+    - cron: "45 11 * * 1-5"
+      timezone: "Europe/Istanbul" # Hafta içi 11:45 İstanbul saati
 
 concurrency:
   group: personel-rehber
