@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "25 8 * * 1-5" # Hafta içi 09:10 Türkiye saati
+    - cron: "30 8 * * 1-5" # Hafta içi 09:10 Türkiye saati
 
 concurrency:
   group: personel-rehber
