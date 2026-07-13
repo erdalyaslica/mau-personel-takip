@@ -8,10 +8,6 @@ on:
         required: false
         type: boolean
         default: false
-  schedule:
-    - cron: "45 8 * * 1-5" # Kalıcı: hafta içi 11:45 Türkiye saati
-    - cron: "10 9 13 7 *" # Geçici doğrulama: 13 Temmuz 12:10 Türkiye saati
-
 concurrency:
   group: personel-rehber
   cancel-in-progress: false
