@@ -1,0 +1,79 @@
+name: Otomatik Personel Rehber Kontrolü
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "10 15 * * 1-5"
+      timezone: "Europe/Istanbul" # Hafta içi 11:45 İstanbul saati
+concurrency:
+  group: personel-rehber
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+      - name: Geçiş için önceki listeyi cache'den yükle
+        if: hashFiles('rehber_durumu.csv') == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: rehber_durumu.csv
+          key: personel-state-${{ github.run_id }}
+          restore-keys: personel-state-
+      - name: Rehberi kontrol et
+        env:
+          SCRAPEDO_TOKEN: ${{ secrets.SCRAPEDO_TOKEN }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_ALLOWED_CHAT_ID: ${{ secrets.TG_ALLOWED_CHAT_ID }}
+          SEND_TEST_EMAIL: "false"
+        run: python mau_rehber.py
+      - name: Güncel listeyi Files bölümüne kaydet
+        if: success() && hashFiles('rehber_durumu.csv') != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rehber_durumu.csv
+          if git diff --cached --quiet; then
+            echo "Personel listesinde dosya değişikliği yok."
+          else
+            git commit -m "Personel listesini güncelle"
+            git fetch origin main
+            git rebase origin/main
+            for i in 1 2 3 4 5; do
+              if git push origin HEAD:main; then
+                break
+              fi
+              echo "Push reddedildi, tekrar deneniyor ($i)..."
+              git fetch origin main
+              git rebase origin/main
+              sleep $((RANDOM % 5 + 1))
+            done
+          fi
+      - name: İndirilebilir personel listesini yayınla
+        if: success() && hashFiles('rehber_durumu.csv') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: personel-listesi-${{ github.run_number }}
+          path: rehber_durumu.csv
+          retention-days: 30
+          if-no-files-found: error
+      - name: Teşhis çıktısını sakla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: personel-rehber-hata-${{ github.run_id }}
+          path: rehber_durumu.csv
+          if-no-files-found: ignore
+          retention-days: 7
