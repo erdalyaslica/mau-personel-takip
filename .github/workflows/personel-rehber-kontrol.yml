@@ -2,8 +2,8 @@ name: Otomatik Personel Rehber Kontrolü
 on:
   workflow_dispatch:
   schedule:
-    - cron: "10 15 * * 1-5"
-      timezone: "Europe/Istanbul" # Hafta içi 11:45 İstanbul saati
+    - cron: "10 6 * * 1-5" # Hafta içi 09:10 İstanbul saati (UTC+3)
+    - cron: "10 15 * * 1-5" # Hafta içi 18:10 İstanbul saati (UTC+3)
 concurrency:
   group: personel-rehber
   cancel-in-progress: false

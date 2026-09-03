@@ -20,4 +20,4 @@ Maltepe Üniversitesi personel rehberini hafta içi her sabah kontrol eder. Yeni
 
 Repository **Settings → Secrets and variables → Actions** bölümüne `SCRAPEDO_TOKEN`, `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAILS` ve isteğe bağlı olarak `TG_TOKEN`, `TG_ALLOWED_CHAT_ID` eklenmelidir.
 
-İş akışı **Actions → Personel Rehber Kontrolü → Run workflow** ile elle denenebilir. Zamanlama hafta içi Türkiye saatiyle 09:10'dur.
+İş akışı **Actions → Personel Rehber Kontrolü → Run workflow** ile elle denenebilir. Otomatik kontrol hafta içi Türkiye saatiyle 09:10 ve 18:10'da olmak üzere günde iki kez çalışır.
