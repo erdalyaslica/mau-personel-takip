@@ -1,6 +1,6 @@
 # Mau Personel Takip
 
-Maltepe Üniversitesi personel rehberini hafta içi her sabah kontrol eder. Yeni katılan veya ayrılan personel olduğunda e-posta, isteğe bağlı olarak Telegram bildirimi gönderir.
+Maltepe Üniversitesi personel rehberini hafta içi sabah ve akşam kontrol eder. Yeni katılan veya ayrılan personel olduğunda e-posta, isteğe bağlı olarak Telegram bildirimi gönderir.
 
 ## Çalışma biçimi
 
@@ -12,12 +12,22 @@ Maltepe Üniversitesi personel rehberini hafta içi her sabah kontrol eder. Yeni
 - CSV ayrıca ilgili Actions çalışmasında 30 gün indirilebilir dosya olarak sunulur.
 - İlk çalışmada güncel liste başlangıç verisi olarak saklanır ve toplu “yeni personel” bildirimi gönderilmez.
 
+## Telegramdan anlık kontrol
+
+Telegram botuna yalnızca yetkili sohbetten:
+
+`/kontrol`
+
+komutu gönderildiğinde rehber taraması başlatılır. GitHub Actions yeni komutları yaklaşık 5 dakikada bir kontrol eder; GitHub yoğunluğunda gecikme olabilir. Kontrol bittiğinde, değişiklik varsa ayrıntılı Telegram bildirimi; değişiklik yoksa tamamlanma mesajı gönderilir.
+
+`/yardım` komutu kullanılabilir komutları gösterir.
+
 ## Kontrollü test
 
 `rehber_durumu.csv` içinden bir satırı silip değişikliği doğrudan `main` dalına kaydedin. Ardından normal workflow çalıştırın. Silinen kişi “yeni katılan” olarak bildirilir ve otomasyon CSV dosyasını doğru hâline getirir.
 
 ## GitHub Secrets
 
-Repository **Settings → Secrets and variables → Actions** bölümüne `SCRAPEDO_TOKEN`, `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAILS` ve isteğe bağlı olarak `TG_TOKEN`, `TG_ALLOWED_CHAT_ID` eklenmelidir.
+Repository **Settings → Secrets and variables → Actions** bölümüne `SCRAPEDO_TOKEN`, `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAILS` ve Telegram için `TG_TOKEN`, `TG_ALLOWED_CHAT_ID` eklenmelidir.
 
-İş akışı **Actions → Personel Rehber Kontrolü → Run workflow** ile elle denenebilir. Otomatik kontrol hafta içi Türkiye saatiyle 09:10 ve 18:10'da olmak üzere günde iki kez çalışır.
+İş akışı [Personel Rehber Kontrolü](https://github.com/erdalyaslica/mau-personel-takip/actions/workflows/personel-rehber-kontrol.yml) üzerinden `Run workflow` ile elle denenebilir. `send_test_email` açık olursa yalnızca test e-postası gönderilir ve rehber taranmaz. Otomatik rehber kontrolü hafta içi Türkiye saatiyle 09:10 ve 18:10'da çalışır.
