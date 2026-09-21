@@ -1,6 +1,6 @@
-# Mau Personel Takip
+# Personel Takip
 
-Maltepe Üniversitesi personel rehberini hafta içi sabah ve akşam kontrol eder. Yeni katılan veya ayrılan personel olduğunda e-posta, isteğe bağlı olarak Telegram bildirimi gönderir.
+Personel rehberini hafta içi sabah ve akşam kontrol eder. Yeni katılan veya ayrılan personel olduğunda e-posta, isteğe bağlı olarak Telegram bildirimi gönderir.
 
 ## Çalışma biçimi
 
