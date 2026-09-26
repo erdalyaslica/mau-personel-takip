@@ -7,18 +7,12 @@ on:
         required: false
         type: boolean
         default: false
-      process_telegram:
-        description: "Bekleyen Telegram komutlarını işle (rehberi yalnızca /kontrol istenirse tarar)"
-        required: false
-        type: boolean
-        default: false
       webhook_control:
         description: "Telegram webhook üzerinden istenen rehber kontrolü"
         required: false
         type: boolean
         default: false
   schedule:
-    - cron: "3-58/5 * * * *" # Saat başı yoğunluğundan uzak, yaklaşık 5 dakikada bir
     - cron: "10 6 * * 1-5" # Hafta içi 09:10 İstanbul saati (UTC+3)
     - cron: "10 15 * * 1-5" # Hafta içi 18:10 İstanbul saati (UTC+3)
 concurrency:
@@ -46,16 +40,6 @@ jobs:
           path: rehber_durumu.csv
           key: personel-state-${{ github.run_id }}
           restore-keys: personel-state-
-      - name: Telegram komutlarını kontrol et
-        if: (github.event_name == 'schedule' && github.event.schedule == '3-58/5 * * * *') || (github.event_name == 'workflow_dispatch' && inputs.process_telegram)
-        env:
-          SCRAPEDO_TOKEN: ${{ secrets.SCRAPEDO_TOKEN }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-          RECEIVER_EMAILS: ${{ secrets.RECEIVER_EMAILS }}
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_ALLOWED_CHAT_ID: ${{ secrets.TG_ALLOWED_CHAT_ID }}
-        run: python telegram_bot.py
       - name: Webhook üzerinden istenen rehber kontrolü
         if: github.event_name == 'workflow_dispatch' && inputs.webhook_control
         env:
@@ -67,7 +51,7 @@ jobs:
           TG_ALLOWED_CHAT_ID: ${{ secrets.TG_ALLOWED_CHAT_ID }}
         run: python webhook_control.py
       - name: Rehberi kontrol et
-        if: (github.event_name != 'schedule' || github.event.schedule != '3-58/5 * * * *') && !(github.event_name == 'workflow_dispatch' && (inputs.process_telegram || inputs.webhook_control))
+        if: github.event_name != 'workflow_dispatch' || !inputs.webhook_control
         env:
           SCRAPEDO_TOKEN: ${{ secrets.SCRAPEDO_TOKEN }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
