@@ -22,6 +22,32 @@ komutu gönderildiğinde rehber taraması başlatılır. GitHub Actions komutlar
 
 `/yardım` komutu kullanılabilir komutları gösterir.
 
+## Ücretsiz Telegram webhook geçişi
+
+`cloudflare/worker.js`, Cloudflare Workers Free üzerinde Telegram webhook'unu
+karşılar. `/son5` GitHub CSV commit geçmişinden hemen yanıtlanır. `/kontrol`
+önce GitHub Actions `workflow_dispatch` çağrısı yapar ve bir başlangıç mesajı
+gönderir; GitHub taraması bittiğinde sonuç mesajı gönderilir. İş kuyruğunda
+GitHub kaynaklı gecikme olabilir. Kod ve CSV GitHub'da kalır.
+
+Worker'ı `cloudflare/wrangler.toml` ile Cloudflare hesabına yayınlayın.
+Worker'ın dört gizli ortam değişkeni olmalıdır: `TG_TOKEN`,
+`TG_ALLOWED_CHAT_ID`, `GH_TOKEN`, `WEBHOOK_SECRET`. `GH_TOKEN` yalnızca bu
+depo için **Actions: Read and write** ve commit geçmişini okuyabilmesi için
+**Contents: Read-only** izinli, fine-grained GitHub token olmalıdır.
+`WEBHOOK_SECRET` rastgele üretilmiş 32–64 karakterlik bir dize olmalıdır;
+Telegram'ın `secret_token` parametresiyle aynı değer kullanılır. Tokenları
+depoya veya konuşmaya yazmayın.
+
+Worker URL'si `https://<worker>.workers.dev` biçimindeyse Telegram webhook'u
+`https://<worker>.workers.dev/telegram` adresine ayarlanır. Worker yayınlanıp
+gizli değişkenler eklendikten sonra Telegram Bot API `setWebhook` metoduna
+`url` ve `secret_token` gönderin. `getWebhookInfo` ile adresi ve son hatayı
+kontrol edin. `/yardım`, `/son5`, `/kontrol` mesajlarını deneyin. Canlı yanıt
+doğrulanınca mevcut beş dakikalık GitHub Actions `getUpdates` yoklamasını
+kaldırın; webhook varken `getUpdates` çalışmaz. Hafta içi iki otomatik rehber
+taraması GitHub Actions içinde kalır.
+
 ## Kontrollü test
 
 `rehber_durumu.csv` içinden bir satırı silip değişikliği doğrudan `main` dalına kaydedin. Ardından normal workflow çalıştırın. Silinen kişi “yeni katılan” olarak bildirilir ve otomasyon CSV dosyasını doğru hâline getirir.
