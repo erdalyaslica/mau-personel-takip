@@ -22,6 +22,36 @@ komutu gönderildiğinde rehber taraması başlatılır. GitHub Actions yeni kom
 
 `/yardım` komutu kullanılabilir komutları gösterir.
 
+## Sürekli Telegram servisine geçiş
+
+`telegram_service.py` tek örnek olarak kurulacak bir arka plan servisidir.
+`/kontrol` (`kontrol`) ve `/son5` (`son 5`) komutlarını Telegram uzun yoklama
+bağlantısıyla alır. `/kontrol` tarama başında ve sonunda ayrı mesaj yollar;
+güncel listeyi GitHub'a kaydeder. `/son5` CSV dosyasının GitHub commit
+geçmişini okur. Yetkili sohbet dışındaki komutlar işlenmez.
+
+Docker destekleyen ve sürekli çalışan bir **background worker** kurun (depo
+kökündeki `Dockerfile` kullanılır). Tek örnek çalıştırın ve şunları yalnızca
+barındırma sağlayıcısının gizli ortam değişkenlerine girin:
+
+| Değişken | Amaç |
+| --- | --- |
+| `TG_TOKEN` | Mevcut Telegram botunun anahtarı |
+| `TG_ALLOWED_CHAT_ID` | Yetkili sohbet numarası |
+| `SCRAPEDO_TOKEN` | Rehber taraması |
+| `GH_TOKEN` | Bu depoya **Contents: Read and write** izni olan fine-grained GitHub token |
+| `GH_REPOSITORY` | İsteğe bağlı; varsayılan `erdalyaslica/mau-personel-takip` |
+| `GH_BRANCH` | İsteğe bağlı; varsayılan `main` |
+| `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAILS` | `/kontrol` değişikliklerinin e-posta bildirimi isteniyorsa üçü birden |
+
+Tokenları depoya veya Docker imajına yazmayın. Mevcut `TG_TOKEN` ve
+`TG_ALLOWED_CHAT_ID` değerleri GitHub Actions Secrets içinde tutulmaya devam
+eder: planlı tarama bildirim göndermeye devam eder. Servis çalışırken önce
+`/yardım`, `/son5` ve `/kontrol` yanıtlarını deneyin. Başarılı canlı
+doğrulamadan **sonra** Actions'taki `*/5` komut yoklamasını kaldırın; iki
+tüketici aynı anda `getUpdates` çağırmamalıdır. Hafta içi sabah ve akşam
+taraması Actions'ta kalır.
+
 ## Kontrollü test
 
 `rehber_durumu.csv` içinden bir satırı silip değişikliği doğrudan `main` dalına kaydedin. Ardından normal workflow çalıştırın. Silinen kişi “yeni katılan” olarak bildirilir ve otomasyon CSV dosyasını doğru hâline getirir.
