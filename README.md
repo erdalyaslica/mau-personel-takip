@@ -18,7 +18,7 @@ Telegram botuna yalnızca yetkili sohbetten:
 
 `/kontrol`
 
-komutu gönderildiğinde rehber taraması başlatılır. GitHub Actions yeni komutları yaklaşık 5 dakikada bir kontrol eder; GitHub yoğunluğunda gecikme olabilir. Kontrol bittiğinde, değişiklik varsa ayrıntılı Telegram bildirimi; değişiklik yoksa tamamlanma mesajı gönderilir.
+komutu gönderildiğinde rehber taraması başlatılır. GitHub Actions komutları yaklaşık 5 dakikada bir kontrol etmeyi dener; GitHub zamanlanmış çalışmaları geciktirebilir veya atlayabilir. Bekleyen komutu hemen işlemek için Actions → Personel Rehber Kontrolü → Run workflow bölümünde `process_telegram` seçeneğini açıp çalıştırın. Kontrol bittiğinde, değişiklik varsa ayrıntılı Telegram bildirimi; değişiklik yoksa tamamlanma mesajı gönderilir.
 
 `/yardım` komutu kullanılabilir komutları gösterir.
 
