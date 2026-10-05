@@ -20,6 +20,7 @@ def main():
         before = mau_rehber.load_state()
         after = mau_rehber.fetch_personnel()
         added, removed = mau_rehber.compare(before, after)
+        mau_rehber.write_result("personel", status="success", summary="Değişiklik yok." if not (added or removed) else f"{len(added)} yeni katılan, {len(removed)} ayrılan.", total=len(after), added=[mau_rehber.person_summary(p) for p in added], removed=[mau_rehber.person_summary(p) for p in removed])
         mau_rehber.save_state(after)
         mau_rehber.send_telegram(control_result_text(before, after))
         if before and (added or removed):
