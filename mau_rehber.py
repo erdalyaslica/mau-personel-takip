@@ -1,3 +1,4 @@
+from panel_result import panel_only, write_result, person_summary
 import csv
 import html
 import json
@@ -112,6 +113,8 @@ def load_state():
 
 
 def save_state(rows):
+    if panel_only():
+        return
     fields = ("Unvan", "Ad", "Soyad", "Birim", "Görev", "E-posta", "Dahili")
     temp = STATE_FILE.with_suffix(".tmp")
     with temp.open("w", encoding="utf-8-sig", newline="") as handle:
@@ -179,6 +182,8 @@ def report_html(added, removed, total):
 
 
 def send_email(subject, body):
+    if panel_only():
+        return
     sender = required("SENDER_EMAIL")
     password = required("SENDER_PASSWORD")
     recipients = [x.strip() for x in required("RECEIVER_EMAILS").split(",") if x.strip()]
@@ -191,6 +196,8 @@ def send_email(subject, body):
 
 
 def send_telegram(text):
+    if panel_only():
+        return
     token, chat_id = os.getenv("TG_TOKEN", "").strip(), os.getenv("TG_ALLOWED_CHAT_ID", "").strip()
     if not token or not chat_id:
         return
@@ -258,10 +265,12 @@ def main():
         old = load_state()
         current = fetch_personnel()
         if not old:
+            write_result("personel", status="success", summary="İlk karşılaştırma listesi oluşturuldu.", total=len(current), added=[], removed=[], initial=True)
             save_state(current)
             logging.info("İlk çalışma: %d kişi başlangıç verisi olarak kaydedildi; bildirim gönderilmedi.", len(current))
             return 0
         added, removed = compare(old, current)
+        write_result("personel", status="success", summary="Değişiklik yok." if not (added or removed) else f"{len(added)} yeni katılan, {len(removed)} ayrılan.", total=len(current), added=[person_summary(p) for p in added], removed=[person_summary(p) for p in removed])
         if added or removed:
             send_email("Maltepe Rehber Değişiklik Raporu", report_html(added, removed, len(current)))
             send_telegram(telegram_report(added, removed, len(current)))
@@ -270,6 +279,7 @@ def main():
         save_state(current)
         return 0
     except Exception as exc:
+        write_result("personel", status="error", summary="Kontrol tamamlanamadı. Son başarılı sonuç için panel geçmişine bakın.")
         logging.exception("Çalışma başarısız: %s", exc)
         try:
             send_telegram("Maltepe Rehber botu hata verdi: " + str(exc))
