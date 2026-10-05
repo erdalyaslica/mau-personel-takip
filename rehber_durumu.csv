@@ -15,7 +15,7 @@ Prof.Dr.,HAVVA ÖZDEN,BADEMCİ,İnsan ve Toplum Bilimleri Fakültesi,Dekan Vekil
 ,ELÇİN,KILIÇ ŞARMAN,Lisansüstü Eğitim Enstitüsü,Enstitü Sekreteri,elcinkilic@maltepe.edu.tr,2678
 ,ZUHAL,NAZIM,Yazı İşleri Müdürlüğü,Yazı İşleri Müdürü,zuhalnazim@maltepe.edu.tr,
 ,NEVİN,TAŞALTIN,Lisansüstü Eğitim Enstitüsü,Müdür,nevintasaltin@maltepe.edu.tr,
-,ÖZLEM,TURAN,Personel ve İdari İşler Daire Başkanlığı,Daire Başkanı,ozlemturan@maltepe.edu.tr,
+,ÖZLEM,TURAN,Personel ve İdari İşler Daire Başkanlığı,Personel ve İdari İşler Daire Başkanı,ozlemturan@maltepe.edu.tr,
 ,ERDEM,YAZAR,"Basın, Halkla İlişkiler ve Tanıtım Daire Başkanlığı",Daire Başkanı,erdemyazar@maltepe.edu.tr,
 ,BAYRAM,YILDIRIM,Mali İşler Daire Başkanlığı,Daire Başkanı,bayramyildirim@maltepe.edu.tr,
 ,SALİM,EKİNCİ,Yapı İşleri ve Teknik İşler Daire Başkanlığı,Tesisatçı,salimekinci@maltepe.edu.tr,
@@ -32,9 +32,7 @@ Dr. Öğr. Üyesi,RIZA GÜRLER,AKGÜN,Maltepe Üniversitesi,Rektör Danışmanı
 Müdür,ÇİÇEK,AKCAN,Sürekli Eğitim Merkezi (MASEM),Müdür,cicekakcan@maltepe.edu.tr,2659
 Dr. Öğr. Üyesi,ECE,ALAGÖZ,Hemşirelik Yüksekokulu,Müdür,ecealagoz@maltepe.edu.tr,
 Prof.Dr.,ÇİĞDEM,İYİCİL,Konservatuvar,Müdür,cigdemiyicil@maltepe.edu.tr,2059
-Dr. Öğr. Üyesi,NURAN,KARAAĞAOĞLU,Meslek Yüksekokulu,Müdür,nurankaraagaoglu@maltepe.edu.tr,2280
-Dr. Öğr. Üyesi,MERAL,ÇAKAR,Meslek Yüksekokulu,Müdür Yardımcısı,meralcakar@maltepe.edu.tr,
-Dr. Öğr. Üyesi,SİNEM,UYSAL BAYRAKTAR,Meslek Yüksekokulu,Müdür Yardımcısı,sinemuysal@maltepe.edu.tr,
+Dr. Öğr. Üyesi,MERAL,ÇAKAR,İş Sağlığı ve Güvenlik Programı,Dr. Öğr. Üyesi,meralcakar@maltepe.edu.tr,2284
 ,MEHDİ,KESKİN,Sağlık Kültür ve Spor Daire Başkanlığı,Daire Başkanı,mehdikeskin@maltepe.edu.tr,
 Daire Başkanı,MUSTAFA,SERİN,Kütüphane ve Dokümantasyon Daire Başkanlığı,Daire Başkanı,mustafaserin@maltepe.edu.tr,2069
 Daire Başkanı,AHMET,USTA,Bilgi İşlem Daire Başkanlığı,Daire Başkanı,ahmetusta@maltepe.edu.tr,
@@ -120,7 +118,6 @@ Prof.Dr.,PINAR,ÖNGÜRÜ,Enfeksiyon Hastalıkları,Prof Dr,pinar.onguru@maltepe.
 Prof.Dr.,GÜNCEL,ÖNKAL,Felsefe Bölümü,Prof Dr,guncelonkal@maltepe.edu.tr,2237/2203
 Prof.Dr.,ALPAY,ÖRKİ,Göğüs Cerrahisi,Prof Dr,alpay.orki@maltepe.edu.tr,4440620/1702
 Prof.Dr.,CANGÜL,ÖRNEK KONU,Siyaset Bilimi ve Uluslararası İlişkiler Bölümü,Prof Dr,cangulornek@maltepe.edu.tr,2411
-Prof.Dr.,ÜMİT,ÖZEKİCİ,Kadın Hastalıkları ve Doğum,Prof Dr,umit.ozekici@maltepe.edu.tr,4440620/1105
 Prof.Dr.,ZELİHA,ÖZER,Anestezi ve Reaminasyon,Prof Dr,zelihaozer@maltepe.edu.tr,4440620/2059
 Prof.Dr.,YEKTA,ÖZGÜVEN,Mimarlık (İngilizce) Bölümü,Prof Dr,yektaozguven@maltepe.edu.tr,2480
 Prof.Dr.,HANDAN,ÖZSIRKINTI KASAP,Gemi ve Yat Tasarımı Bölümü,Prof Dr,handankasap@maltepe.edu.tr,2483
@@ -299,8 +296,8 @@ Dr. Öğr. Üyesi,FARHAD,SHIDFAR,Türk Halk Müziği Anasanat Dalı,Dr. Öğr. �
 Dr. Öğr. Üyesi,AYŞE İ GEVHER,SOLAKOĞLU,Nükleer Tıp Anabilim Dalı,Dr. Öğr. Üyesi,ayseigevhersolakoglu@maltepe.edu.tr,4440620
 Dr. Öğr. Üyesi,ELİF,SUNGUR,Halkla İlişkiler ve Tanıtım Bölümü,Dr. Öğr. Üyesi,elifsungur@maltepe.edu.tr,2730
 Dr. Öğr. Üyesi,BÜŞRA NEHİR,ŞAHİN,Dil ve Konuşma Terapisi Bölümü,Dr. Öğr. Üyesi,busranehirsahin@maltepe.edu.tr,
-Dr. Öğr. Üyesi,ENDER,ŞAHİNASLAN,Yönetim Bilişim Sistemleri Bölümü,Dr. Öğr. Üyesi,endersahinaslan@maltepe.edu.tr,
 Dr. Öğr. Üyesi,ÖNDER,ŞAHİNASLAN,Yönetim Bilişim Sistemleri Bölümü,Dr. Öğr. Üyesi,ondersahinaslan@maltepe.edu.tr,
+Dr. Öğr. Üyesi,ENDER,ŞAHİNASLAN,Yönetim Bilişim Sistemleri Bölümü,Dr. Öğr. Üyesi,endersahinaslan@maltepe.edu.tr,
 Dr. Öğr. Üyesi,TURHAN,ŞALVA,Halk Sağlığı,Dr. Öğr. Üyesi,turhansalva@maltepe.edu.tr,4440620
 Doç. Dr.,AYSU ZEHRA,ŞANVER,Üflemeli ve Vurmalı Çalgılar Anasanat Dalı,Doç. Dr.,aysuzehrasanver@maltepe.edu.tr,
 Dr. Öğr. Üyesi,RIFAT VOLKAN,ŞENYUVA,Elektrik- Elektronik Mühendisliği (İngilizce),Dr. Öğr. Üyesi,rifatvolkansenyuva@maltepe.edu.tr,2392
@@ -316,6 +313,7 @@ Dr. Öğr. Üyesi,ÇAĞDAŞ,TURAN,Turizm ve Otel İşletmeciliği Programı,Dr. 
 Dr. Öğr. Üyesi,ATİYE,TÜMENBATUR,Uluslararası Ticaret ve Lojistik Bölümü,Dr. Öğr. Üyesi,atiyetumenbatur@maltepe.edu.tr,2375
 Dr. Öğr. Üyesi,YAVUZ BOĞAÇ,TÜRKOĞULLARI,Endüstri Mühendisliği (İngilizce) Bölümü,Dr. Öğr. Üyesi,yavuzturkogullari@maltepe.edu.tr,2521
 Dr. Öğr. Üyesi,DOĞA,ULCAY,Hemşirelik Yüksekokulu,Dr. Öğr. Üyesi,dogaulcay@maltepe.edu.tr,2163
+Dr. Öğr. Üyesi,SİNEM,UYSAL BAYRAKTAR,Turizm ve Otel İşletmeciliği Programı,Dr. Öğr. Üyesi,sinemuysal@maltepe.edu.tr,
 Dr. Öğr. Üyesi,ÖMER KAYS,ÜNAL,Ortopedi ve Travmatoloji,Dr. Öğr. Üyesi,omerkaysunal@maltepe.edu.tr,4440620
 Dr. Öğr. Üyesi,ZEYNEP,VATANSEVER PINAR,Çocuk ve Ergen Ruh Sağlığı ve Hastalıkları,Dr. Öğr. Üyesi,zeynep.vatansever@maltepe.edu.tr,
 Dr. Öğr. Üyesi,AYŞENUR,YAMAN,Uluslararası Ticaret ve Lojistik (İngilizce) Bölümü,Dr. Öğr. Üyesi,aysenuryaman@maltepe.edu.tr,2373
@@ -572,7 +570,6 @@ Dr. Öğr. Üyesi,MELEK,ERDİL,İşletme (İngilizce) Bölümü,Dr. Öğr. Üyes
 Dr. Öğr. Üyesi,BEGÜM,ÖZDEMİR DEMİRCİ,Psikoloji (İngilizce) Bölümü,Dr. Öğr. Üyesi,begumozdemir@maltepe.edu.tr,
 Dr. Öğr. Üyesi,HÜSEYİN,YENER,Endüstri Mühendisliği (İngilizce) Bölümü,Dr. Öğr. Üyesi,huseyinyener@maltepe.edu.tr,2509
 Öğr. Gör.,ÜLKÜ,AKGÜN,Türkçe Öğretimi Uygulama ve Araştırma Merkezi,Müdür Yardımcısı,ulkuakgun@maltepe.edu.tr,
-Dr. Öğr. Üyesi,MERAL,ÇAKAR,İş Sağlığı ve Güvenlik Programı,Dr. Öğr. Üyesi,meralcakar@maltepe.edu.tr,2284
 Dr. Öğr. Üyesi,ESRA,ÖKTEM,Teknoloji ve İnsan İlişkileri Uygulama ve Araştırma Merkezi,Müdür,esraoktem@maltepe.edu.tr,
 Dr. Öğr. Üyesi,ALİ,TAŞTEKİN,Türkçe Öğretimi Uygulama ve Araştırma Merkezi,Müdür,alitastekin@maltepe.edu.tr,
 Prof.Dr.,ORHAN,TÜRKEN,Kanser ve Kök Hücre Uygulama ve Araştırma Merkezi,Müdür,orhan.turken@maltepe.edu.tr,
