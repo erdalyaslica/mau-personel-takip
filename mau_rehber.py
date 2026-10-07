@@ -175,8 +175,12 @@ def report_html(added, removed, total):
     content = summary + table("Yeni katılanlar", "#188038", "#eaf7ee", added) + table("Ayrılanlar", "#d93025", "#fff0ef", removed)
     return email_shell(
         "Personel Rehberi",
-        "Rehberde değişiklik var.",
-        f"{datetime.now().strftime('%d.%m.%Y %H:%M')} itibarıyla güncel karşılaştırma özeti.",
+        "Rehberde değişiklik var." if (added or removed) else "Rehber kontrolü tamamlandı.",
+        (
+            f"{datetime.now().strftime('%d.%m.%Y %H:%M')} itibarıyla güncel karşılaştırma özeti."
+            if (added or removed)
+            else f"{datetime.now().strftime('%d.%m.%Y %H:%M')} itibarıyla personel değişikliği tespit edilmedi."
+        ),
         content,
     )
 
@@ -233,6 +237,9 @@ def telegram_report(added, removed, total):
             department = person["Birim"] or "Birim belirtilmemiş"
             lines.extend([f"• {name}", f"  └ {department}"])
 
+    if not added and not removed:
+        lines.extend(["", "ℹ️ Bu kontrolde personel değişikliği tespit edilmedi."])
+
     if removed:
         lines.extend(["", f"🔴 AYRILANLAR ({len(removed)})"])
         for person in removed:
@@ -264,19 +271,41 @@ def main():
             return 0
         old = load_state()
         current = fetch_personnel()
-        if not old:
-            write_result("personel", status="success", summary="İlk karşılaştırma listesi oluşturuldu.", total=len(current), added=[], removed=[], initial=True)
-            save_state(current)
-            logging.info("İlk çalışma: %d kişi başlangıç verisi olarak kaydedildi; bildirim gönderilmedi.", len(current))
-            return 0
-        added, removed = compare(old, current)
-        write_result("personel", status="success", summary="Değişiklik yok." if not (added or removed) else f"{len(added)} yeni katılan, {len(removed)} ayrılan.", total=len(current), added=[person_summary(p) for p in added], removed=[person_summary(p) for p in removed])
-        if added or removed:
-            send_email("Maltepe Rehber Değişiklik Raporu", report_html(added, removed, len(current)))
-            send_telegram(telegram_report(added, removed, len(current)))
-        else:
-            logging.info("Değişiklik yok; bildirim gönderilmedi.")
+        initial = not old
+        added, removed = compare(old, current) if old else ([], [])
+        summary = (
+            "İlk karşılaştırma listesi oluşturuldu."
+            if initial
+            else "Değişiklik yok."
+            if not (added or removed)
+            else f"{len(added)} yeni katılan, {len(removed)} ayrılan."
+        )
+        write_result(
+            "personel",
+            status="success",
+            summary=summary,
+            total=len(current),
+            added=[person_summary(p) for p in added],
+            removed=[person_summary(p) for p in removed],
+            initial=initial,
+        )
         save_state(current)
+
+        # Zamanlanmış her çalışmada durum özeti gönderilir. Panelden başlatılan
+        # sessiz kontrollerde PANEL_ONLY bu iki gönderimi güvenli biçimde atlar.
+        subject = "Maltepe Rehber Kontrol Sonucu"
+        if added or removed:
+            subject = "Maltepe Rehber Değişiklik Raporu"
+        try:
+            send_email(subject, report_html(added, removed, len(current)))
+        except Exception:
+            logging.exception("E-posta bildirimi başarısız")
+        try:
+            send_telegram(telegram_report(added, removed, len(current)))
+        except Exception:
+            logging.exception("Telegram bildirimi başarısız")
+
+        logging.info("Rehber kontrolü tamamlandı: %d yeni, %d ayrılan, %d toplam.", len(added), len(removed), len(current))
         return 0
     except Exception as exc:
         write_result("personel", status="error", summary="Kontrol tamamlanamadı. Son başarılı sonuç için panel geçmişine bakın.")
