@@ -267,7 +267,12 @@ def main():
                     "#30a14e",
                 ),
             )
-            logging.info("Test e-postası gönderildi; rehber taraması yapılmadı.")
+            send_telegram(
+                "✅ Maltepe Rehber Botu Testi Başarılı\n"
+                + datetime.now().strftime("🕒 %d.%m.%Y %H:%M")
+                + "\n\nE-posta ve Telegram bildirim kanalları test edildi."
+            )
+            logging.info("Test e-postası ve Telegram bildirimi gönderildi; rehber taraması yapılmadı.")
             return 0
         old = load_state()
         current = fetch_personnel()
