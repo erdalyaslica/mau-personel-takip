@@ -296,19 +296,18 @@ def main():
         )
         save_state(current)
 
-        # Zamanlanmış her çalışmada durum özeti gönderilir. Panelden başlatılan
-        # sessiz kontrollerde PANEL_ONLY bu iki gönderimi güvenli biçimde atlar.
-        subject = "Maltepe Rehber Kontrol Sonucu"
+        # Bildirim yalnızca rehberde gerçek bir değişiklik tespit edilirse gönderilir.
         if added or removed:
-            subject = "Maltepe Rehber Değişiklik Raporu"
-        try:
-            send_email(subject, report_html(added, removed, len(current)))
-        except Exception:
-            logging.exception("E-posta bildirimi başarısız")
-        try:
-            send_telegram(telegram_report(added, removed, len(current)))
-        except Exception:
-            logging.exception("Telegram bildirimi başarısız")
+            try:
+                send_email("Maltepe Rehber Değişiklik Raporu", report_html(added, removed, len(current)))
+            except Exception:
+                logging.exception("E-posta bildirimi başarısız")
+            try:
+                send_telegram(telegram_report(added, removed, len(current)))
+            except Exception:
+                logging.exception("Telegram bildirimi başarısız")
+        else:
+            logging.info("Değişiklik yok; bildirim gönderilmedi.")
 
         logging.info("Rehber kontrolü tamamlandı: %d yeni, %d ayrılan, %d toplam.", len(added), len(removed), len(current))
         return 0
