@@ -1,11 +1,10 @@
-"""Run one requested personnel scan and always report its outcome to Telegram."""
+"""Run one requested personnel scan and report only detected changes."""
 
 import logging
 import signal
 import sys
 
 import mau_rehber
-from telegram_bot import control_result_text
 
 
 def _timeout(signum, frame):
@@ -23,22 +22,20 @@ def main():
         mau_rehber.write_result("personel", status="success", summary="Değişiklik yok." if not (added or removed) else f"{len(added)} yeni katılan, {len(removed)} ayrılan.", total=len(after), added=[mau_rehber.person_summary(p) for p in added], removed=[mau_rehber.person_summary(p) for p in removed])
         mau_rehber.save_state(after)
 
-        # /kontrol isteği de her seferinde iki kanala sonuç özeti gönderir.
-        # PANEL_ONLY ile başlayan panel kontrollerinde ilgili fonksiyonlar sessiz kalır.
-        subject = "Maltepe Rehber Kontrol Sonucu"
         if added or removed:
-            subject = "Maltepe Rehber Değişiklik Raporu"
-        try:
-            mau_rehber.send_email(
-                subject,
-                mau_rehber.report_html(added, removed, len(after)),
-            )
-        except Exception:
-            logging.exception("E-posta bildirimi başarısız")
-        try:
-            mau_rehber.send_telegram(control_result_text(before, after))
-        except Exception:
-            logging.exception("Telegram bildirimi başarısız")
+            try:
+                mau_rehber.send_email(
+                    "Maltepe Rehber Değişiklik Raporu",
+                    mau_rehber.report_html(added, removed, len(after)),
+                )
+            except Exception:
+                logging.exception("E-posta bildirimi başarısız")
+            try:
+                mau_rehber.send_telegram(mau_rehber.telegram_report(added, removed, len(after)))
+            except Exception:
+                logging.exception("Telegram bildirimi başarısız")
+        else:
+            logging.info("Değişiklik yok; bildirim gönderilmedi.")
         return 0
     except Exception:
         logging.exception("İstenen rehber taraması tamamlanamadı")
